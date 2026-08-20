@@ -1,0 +1,45 @@
+{
+  "name": "@absolutejs/devices",
+  "version": "0.0.1",
+  "description": "Provider-neutral device capability contracts and web, SSR, and test adapters for AbsoluteJS",
+  "type": "module",
+  "license": "BSL-1.1",
+  "author": "Alex Kahn",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/absolutejs/devices.git",
+    "directory": "packages/devices"
+  },
+  "homepage": "https://github.com/absolutejs/devices",
+  "bugs": {
+    "url": "https://github.com/absolutejs/devices/issues"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "bun build src/index.ts src/runtime.ts src/testing.ts --outdir dist --target=browser && tsc --emitDeclarationOnly -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  }
+}

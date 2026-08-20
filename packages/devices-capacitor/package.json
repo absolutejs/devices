@@ -1,0 +1,50 @@
+{
+  "name": "@absolutejs/devices-capacitor",
+  "version": "0.0.1",
+  "description": "Capacitor runtime adapter for @absolutejs/devices",
+  "type": "module",
+  "license": "BSL-1.1",
+  "author": "Alex Kahn",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/absolutejs/devices.git",
+    "directory": "packages/devices-capacitor"
+  },
+  "homepage": "https://github.com/absolutejs/devices",
+  "bugs": {
+    "url": "https://github.com/absolutejs/devices/issues"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target=browser --external @absolutejs/devices --external @capacitor/core --external @capacitor/app --external @capacitor/browser --external @capacitor/network --external @capacitor/preferences && tsc --emitDeclarationOnly -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/browser": "^8.0.0",
+    "@capacitor/network": "^8.0.0",
+    "@capacitor/preferences": "^8.0.0"
+  },
+  "peerDependencies": {
+    "@absolutejs/devices": "^0.0.1",
+    "@capacitor/core": ">=8 <9"
+  },
+  "devDependencies": {
+    "@absolutejs/devices": "workspace:*"
+  }
+}
