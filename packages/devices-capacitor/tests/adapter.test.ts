@@ -25,6 +25,7 @@ const createBindings = (
   const listeners = new Map<string, Set<Listener>>();
   const values = new Map<string, string>([["another.package.key", "keep"]]);
   const openedUrls: string[] = [];
+  const backHandlerStates: boolean[] = [];
   let active = true;
   let network = {
     connected: true,
@@ -65,7 +66,9 @@ const createBindings = (
       getState: async () => ({ isActive: active }),
       minimizeApp: async () => undefined,
       removeAllListeners: async () => listeners.clear(),
-      toggleBackButtonHandler: async () => undefined,
+      toggleBackButtonHandler: async ({ enabled }: { enabled: boolean }) => {
+        backHandlerStates.push(enabled);
+      },
     },
     browser: {
       addListener,
@@ -105,6 +108,7 @@ const createBindings = (
   } as unknown as CapacitorDeviceBindings;
 
   return {
+    backHandlerStates,
     bindings,
     emitBack: (canGoBack: boolean) => emit("backButton", { canGoBack }),
     emitLifecycle: (state: "active" | "background") => {
@@ -224,8 +228,9 @@ describe("Capacitor device adapter", () => {
   });
 
   test("exposes Android-only back capability without registering on iOS", async () => {
+    const androidController = createBindings({ platform: "android" });
     const android = createCapacitorDeviceAdapter({
-      bindings: createBindings({ platform: "android" }).bindings,
+      bindings: androidController.bindings,
     });
     const iosController = createBindings({ platform: "ios" });
     const ios = createCapacitorDeviceAdapter({
@@ -239,12 +244,15 @@ describe("Capacitor device adapter", () => {
     expect(await android.back?.capability()).toEqual(
       availableCapability("native", { platform: "android" }),
     );
+    const removeAndroid = await android.back?.onPress(() => undefined);
+    expect(androidController.backHandlerStates).toEqual([true]);
     expect(await ios.back?.capability()).toMatchObject({
       available: false,
       reason: "unsupported",
     });
     iosController.emitBack(true);
     expect(presses).toBe(0);
+    await removeAndroid?.();
     await remove?.();
   });
 

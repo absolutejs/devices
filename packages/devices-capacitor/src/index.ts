@@ -213,6 +213,15 @@ export const createCapacitorDeviceAdapter = (
               listener({ canGoBack: event.canGoBack, native: event }),
             ),
         );
+        try {
+          await callProvider(
+            "Failed to enable Android back-button interception.",
+            () => bindings.app.toggleBackButtonHandler({ enabled: true }),
+          );
+        } catch (error) {
+          await handle.remove().catch(() => undefined);
+          throw error;
+        }
         return removable(
           () => handle.remove(),
           "Failed to remove the Android back-button listener.",
