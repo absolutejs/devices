@@ -7,10 +7,11 @@
   ],
   "scripts": {
     "build": "bun run --cwd packages/devices build && bun run --cwd packages/devices-capacitor build",
-    "check": "bun run typecheck && bun test && bun run build",
+    "check": "bun run typecheck && bun test && bun run build && bun run verify:dist",
     "format": "prettier --write .",
     "test": "bun test",
-    "typecheck": "bun run --filter '@absolutejs/devices*' typecheck"
+    "typecheck": "bun run --filter '@absolutejs/devices*' typecheck",
+    "verify:dist": "bun run scripts/verifyDist.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

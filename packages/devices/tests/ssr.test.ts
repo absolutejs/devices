@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { DeviceError } from "../src/contracts";
 import { createSsrDeviceAdapter } from "../src/adapters/ssr";
+import { back, lifecycle, platform, secureStorage } from "../src";
+import { installDeviceAdapter } from "../src/runtime";
 
 describe("SSR adapter", () => {
   test("is import-safe and reports unavailable effects", async () => {
@@ -16,6 +18,37 @@ describe("SSR adapter", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(DeviceError);
       expect((error as DeviceError).code).toBe("unavailable");
+    }
+  });
+
+  test("public capability queries and optional events are SSR-safe", async () => {
+    const remove = installDeviceAdapter(createSsrDeviceAdapter());
+    try {
+      expect(await platform.capability()).toMatchObject({
+        available: false,
+        reason: "unavailable",
+      });
+      expect(await back.capability()).toMatchObject({
+        available: false,
+        reason: "unsupported",
+      });
+      expect(await secureStorage.capability()).toMatchObject({
+        available: false,
+        reason: "unsupported",
+      });
+      await expect(secureStorage.get("credential")).rejects.toMatchObject({
+        code: "unsupported",
+      });
+      const removeBack = await back.onPress(() => {
+        throw new Error("SSR back listener must not run.");
+      });
+      const removeRestored = await lifecycle.onRestoredOperation(() => {
+        throw new Error("SSR restored-operation listener must not run.");
+      });
+      await removeBack();
+      await removeRestored();
+    } finally {
+      remove();
     }
   });
 });

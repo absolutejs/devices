@@ -2,18 +2,27 @@ import type { DeviceAdapter } from "./contracts";
 import { createSsrDeviceAdapter } from "./adapters/ssr";
 import { createWebDeviceAdapter } from "./adapters/web";
 
-let adapter: DeviceAdapter | undefined;
+type DeviceAdapterInstallation = {
+  adapter: DeviceAdapter;
+};
+
+let fallbackAdapter: DeviceAdapter | undefined;
+const installations: DeviceAdapterInstallation[] = [];
 
 const defaultAdapter = () =>
   typeof window === "undefined" || typeof navigator === "undefined"
     ? createSsrDeviceAdapter()
     : createWebDeviceAdapter();
 
-export const getDeviceAdapter = () => (adapter ??= defaultAdapter());
+export const getDeviceAdapter = () =>
+  installations.at(-1)?.adapter ?? (fallbackAdapter ??= defaultAdapter());
 
 export const installDeviceAdapter = (next: DeviceAdapter) => {
-  adapter = next;
+  const installation = { adapter: next };
+  installations.push(installation);
+
   return () => {
-    if (adapter === next) adapter = undefined;
+    const index = installations.indexOf(installation);
+    if (index >= 0) installations.splice(index, 1);
   };
 };

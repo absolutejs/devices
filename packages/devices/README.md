@@ -1,5 +1,25 @@
 # @absolutejs/devices
 
-Application-facing device capability contracts for AbsoluteJS. Runtime adapters are selected by AbsoluteJS; application code does not branch on its native provider.
+Application-facing device capability contracts for AbsoluteJS. Runtime adapters
+are selected by AbsoluteJS; application code does not branch on its native
+provider.
 
-The initial pre-1.0 surface covers platform, lifecycle, links, network, and ordinary storage. Permission-sensitive capabilities will be added as isolated subpaths after their cross-runtime behavior is proven.
+The pre-1.0 core includes:
+
+- discriminated capability availability and normalized device errors;
+- shared permission states without implicit permission requests;
+- platform, safe-area, reduced-motion, lifecycle, resume, restored-operation,
+  normalized link, network, and back contracts;
+- separate ordinary and secure-storage surfaces;
+- SSR-safe, standards-based web, and deterministic test adapters;
+- a reusable adapter conformance harness.
+
+Explicit adapter entry points are available at `@absolutejs/devices/web`,
+`@absolutejs/devices/ssr`, and `@absolutejs/devices/testing`. Normal application
+code imports from `@absolutejs/devices`; AbsoluteJS installs the target adapter
+during bootstrap.
+
+Ordinary storage is not appropriate for refresh tokens, private keys, or other
+durable credentials. `secureStorage` fails with a typed `unsupported` error until
+the selected provider installs a real secure-storage adapter. Its test
+implementation is an in-memory emulator, never a claim of cryptographic storage.

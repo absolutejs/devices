@@ -18,12 +18,16 @@ export const createSsrDeviceAdapter = (): DeviceAdapter => ({
       formFactor: "unknown",
       isNative: false,
       os: "unknown",
+      prefersReducedMotion: false,
       runtime: "ssr",
+      safeAreaInsets: { bottom: 0, left: 0, right: 0, top: 0 },
     }),
   },
   lifecycle: {
     getState: async () => "inactive",
     onChange: async () => noopSubscription(),
+    onRestoredOperation: async () => noopSubscription(),
+    onResume: async () => noopSubscription(),
   },
   links: {
     getLaunchUrl: async () => null,

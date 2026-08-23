@@ -21,6 +21,7 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -30,16 +31,24 @@
       "types": "./dist/runtime.d.ts",
       "import": "./dist/runtime.js"
     },
+    "./ssr": {
+      "types": "./dist/ssr.d.ts",
+      "import": "./dist/ssr.js"
+    },
     "./testing": {
       "types": "./dist/testing.d.ts",
       "import": "./dist/testing.js"
+    },
+    "./web": {
+      "types": "./dist/web.d.ts",
+      "import": "./dist/web.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "bun build src/index.ts src/runtime.ts src/testing.ts --outdir dist --target=browser && tsc --emitDeclarationOnly -p tsconfig.build.json",
+    "build": "bun build src/index.ts --outdir dist --target=browser && bun build src/runtime.ts --outdir dist --target=browser && bun build src/ssr.ts --outdir dist --target=browser && bun build src/testing.ts --outdir dist --target=browser && bun build src/web.ts --outdir dist --target=browser && tsc --emitDeclarationOnly -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   }
 }

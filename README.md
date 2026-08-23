@@ -11,7 +11,46 @@ Application code imports capabilities from `@absolutejs/devices`; it does not br
 
 This repository does not own emulator orchestration. Target provisioning, native builds, HMR transport, and app launch are host-side responsibilities of the AbsoluteJS mobile CLI and must never enter an application bundle.
 
-The first implementation wave covers platform information, lifecycle, links, network state, and ordinary key/value storage. Camera, location, files, notifications, secure credentials, and other permission-sensitive capabilities will land as isolated, tree-shakeable slices with conformance tests.
+The core implementation covers platform information, lifecycle/resume/restored
+operations, normalized links, network state, Android-style back events, ordinary
+key/value storage, and a deliberately separate secure-storage seam. Camera,
+location, files, notifications, and other permission-sensitive capabilities will
+land as isolated, tree-shakeable slices with conformance tests.
+
+```ts
+import {
+  back,
+  lifecycle,
+  links,
+  network,
+  platform,
+  secureStorage,
+} from "@absolutejs/devices";
+
+const info = await platform.info();
+const launchLink = await links.getLaunchLink();
+const connection = await network.status();
+
+const removeResume = await lifecycle.onResume(() => {
+  // Refresh ephemeral UI. Durable application synchronization belongs to
+  // @absolutejs/sync rather than the device lifecycle adapter.
+});
+
+if ((await back.capability()).available) {
+  const removeBack = await back.onPress(({ canGoBack }) => {
+    if (canGoBack) history.back();
+  });
+}
+
+if ((await secureStorage.capability()).available) {
+  await secureStorage.set("credential", "provider-owned-secret");
+}
+```
+
+Sensitive permissions are never requested by importing a module or calling a
+capability query. Every future permission-owning feature uses the normalized
+`PermissionState` contract and exposes an explicit `requestPermission()` method
+that applications call from a user action.
 
 ## Development
 
