@@ -12,7 +12,7 @@
     },
     "packages/devices": {
       "name": "@absolutejs/devices",
-      "version": "0.0.1",
+      "version": "0.0.2",
     },
     "packages/devices-capacitor": {
       "name": "@absolutejs/devices-capacitor",
@@ -27,7 +27,7 @@
         "@absolutejs/devices": "workspace:*",
       },
       "peerDependencies": {
-        "@absolutejs/devices": "^0.0.1",
+        "@absolutejs/devices": "^0.0.2",
         "@capacitor/core": ">=8 <9",
       },
     },

@@ -21,6 +21,7 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -41,7 +42,7 @@
     "@capacitor/preferences": "^8.0.0"
   },
   "peerDependencies": {
-    "@absolutejs/devices": "^0.0.1",
+    "@absolutejs/devices": "^0.0.2",
     "@capacitor/core": ">=8 <9"
   },
   "devDependencies": {

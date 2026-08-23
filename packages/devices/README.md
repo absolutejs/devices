@@ -19,6 +19,10 @@ Explicit adapter entry points are available at `@absolutejs/devices/web`,
 code imports from `@absolutejs/devices`; AbsoluteJS installs the target adapter
 during bootstrap.
 
+The installation registry is shared through the JavaScript realm, so
+independently built shell and page bundles still observe the same selected
+adapter.
+
 Ordinary storage is not appropriate for refresh tokens, private keys, or other
 durable credentials. `secureStorage` fails with a typed `unsupported` error until
 the selected provider installs a real secure-storage adapter. Its test

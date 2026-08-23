@@ -4,6 +4,10 @@ const entries = [
   ["../packages/devices/dist/ssr.js", "createSsrDeviceAdapter"],
   ["../packages/devices/dist/testing.js", "createTestDeviceAdapter"],
   ["../packages/devices/dist/web.js", "createWebDeviceAdapter"],
+  [
+    "../packages/devices-capacitor/dist/index.js",
+    "createCapacitorDeviceAdapter",
+  ],
 ] as const;
 
 for (const [specifier, exportedName] of entries) {
@@ -12,4 +16,4 @@ for (const [specifier, exportedName] of entries) {
     throw new Error(`${specifier} does not export ${exportedName}.`);
 }
 
-console.log("All @absolutejs/devices public build entries are importable.");
+console.log("All devices package public build entries are importable.");

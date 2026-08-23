@@ -19,6 +19,12 @@ test            -> explicit in-memory adapter
 
 Browser export conditions cannot distinguish a browser from a Capacitor WebView, so package conditions alone are not the selection mechanism.
 
+The installed-adapter stack lives under a `Symbol.for` realm registry. A mobile
+shell bundle and separately compiled page bundle can therefore contain distinct
+copies of the core package without silently selecting different adapters. Tests
+build two physical runtime bundles and verify that an installation through one
+is visible through the other.
+
 ## Contract rules
 
 - Querying support never requests permission or opens UI.
@@ -57,6 +63,25 @@ cleanup, back behavior, and storage semantics cannot drift.
 Secure storage is deliberately not implemented with browser local storage. The
 seam exists for Auth and other credential owners, but a platform provider must opt
 in with a real secure implementation.
+
+## Capacitor baseline
+
+The Capacitor adapter normalizes App lifecycle, resume, restored results, launch
+and inbound URLs, Android hardware back, Network status, Browser opening, and
+Preferences. Listener cleanup is idempotent and provider failures become typed
+device errors. External browser URLs are limited to HTTP(S) and reject embedded
+credentials.
+
+Preferences keys are namespaced. `clear()` enumerates and removes only keys owned
+by the adapter instead of calling Capacitor's global `Preferences.clear()`. The
+baseline App, Browser, Network, and Preferences plugins are runtime infrastructure
+used by navigation, auth, connectivity/Sync, and compatibility state; future
+permission-sensitive APIs remain separate slices and must not install plugins or
+request permissions merely because the base adapter is present.
+
+Automatic bootstrap installs the adapter only when Capacitor reports a native
+platform. Browser previews retain the web adapter. Secure storage remains absent
+unless a distinct Keychain/Keystore-backed implementation is injected.
 
 ## Emulator ownership
 

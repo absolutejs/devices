@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   back,
   lifecycle,
@@ -110,5 +113,39 @@ describe("@absolutejs/devices runtime", () => {
 
     removeSecond();
     expect((await platform.info()).runtime).not.toBe("test");
+  });
+
+  test("shares installations across independently bundled runtime copies", async () => {
+    const runtimePath = new URL("../src/runtime.ts", import.meta.url).pathname;
+    const root = await mkdtemp(join(tmpdir(), "absolute-device-runtime-"));
+    try {
+      const modules = await Promise.all(
+        ["first", "second"].map(async (name) => {
+          const entry = join(root, `${name}.ts`);
+          await Bun.write(
+            entry,
+            `export * from ${JSON.stringify(runtimePath)};`,
+          );
+          const result = await Bun.build({
+            entrypoints: [entry],
+            outdir: join(root, name),
+            target: "bun",
+          });
+          expect(result.success).toBe(true);
+          const output = result.outputs[0]?.path;
+          if (!output) throw new Error(`Missing ${name} runtime test bundle.`);
+          return import(output) as Promise<typeof import("../src/runtime")>;
+        }),
+      );
+      const [first, second] = modules;
+      if (!first || !second) throw new Error("Missing runtime test module.");
+      const testDevice = createTestDeviceAdapter({ platform: { os: "ios" } });
+      cleanup = first.installDeviceAdapter(testDevice.adapter);
+
+      expect(first).not.toBe(second);
+      expect(second.getDeviceAdapter()).toBe(testDevice.adapter);
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
   });
 });

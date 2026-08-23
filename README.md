@@ -9,6 +9,10 @@ The repository publishes two deliberately separate packages:
 
 Application code imports capabilities from `@absolutejs/devices`; it does not branch on Capacitor or call vendor plugins directly. AbsoluteJS selects the runtime adapter for web, SSR, tests, and installed apps.
 
+The adapter registry is realm-scoped rather than module-scoped. This is required
+because an embedded page and the AbsoluteJS native shell can be compiled as
+independent bundles while sharing one WebView global realm.
+
 This repository does not own emulator orchestration. Target provisioning, native builds, HMR transport, and app launch are host-side responsibilities of the AbsoluteJS mobile CLI and must never enter an application bundle.
 
 The core implementation covers platform information, lifecycle/resume/restored
