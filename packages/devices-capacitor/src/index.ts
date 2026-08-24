@@ -21,6 +21,9 @@ import {
   type DeviceSecureStorageCapability,
   type DeviceSubscription,
 } from "@absolutejs/devices";
+import { createCapacitorSecureStorage } from "./secureStorage";
+
+export * from "./secureStorage";
 
 const COARSE_TABLET_MIN_WIDTH = 768;
 const DEFAULT_STORAGE_PREFIX = "absolutejs.devices.";
@@ -186,6 +189,12 @@ export const createCapacitorDeviceAdapter = (
     (await bindings.preferences.keys()).keys.filter((key) =>
       key.startsWith(prefix),
     );
+  const secureStorage =
+    options.secureStorage ??
+    (bindings.capacitor.isNativePlatform() &&
+    bindings.capacitor.isPluginAvailable("AbsoluteSecureStorage")
+      ? createCapacitorSecureStorage()
+      : undefined);
 
   return {
     runtime: "capacitor",
@@ -345,9 +354,7 @@ export const createCapacitorDeviceAdapter = (
         );
       },
     },
-    ...(options.secureStorage === undefined
-      ? {}
-      : { secureStorage: options.secureStorage }),
+    ...(secureStorage === undefined ? {} : { secureStorage }),
     storage: {
       clear: async () =>
         callProvider("Failed to clear native preferences.", async () => {

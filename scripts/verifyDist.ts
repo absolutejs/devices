@@ -8,6 +8,10 @@ const entries = [
     "../packages/devices-capacitor/dist/index.js",
     "createCapacitorDeviceAdapter",
   ],
+  [
+    "../packages/devices-capacitor/dist/index.js",
+    "createCapacitorSecureStorage",
+  ],
 ] as const;
 
 for (const [specifier, exportedName] of entries) {

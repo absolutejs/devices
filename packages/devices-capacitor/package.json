@@ -15,13 +15,26 @@
     "url": "https://github.com/absolutejs/devices/issues"
   },
   "files": [
+    "android/src/main/",
+    "android/build.gradle",
     "dist",
+    "ios/Sources/",
+    "Package.swift",
+    "AbsoluteDevicesCapacitor.podspec",
     "README.md"
   ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "sideEffects": false,
+  "capacitor": {
+    "android": {
+      "src": "android"
+    },
+    "ios": {
+      "src": "ios"
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
