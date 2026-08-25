@@ -18,7 +18,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
-import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
 import java.util.Properties;
@@ -102,9 +101,14 @@ public class AbsoluteSecureStoragePlugin extends Plugin {
 
     private String encrypt(String value) throws GeneralSecurityException {
         Cipher cipher = Cipher.getInstance(CIPHER);
-        byte[] iv = new byte[IV_BYTES];
-        new SecureRandom().nextBytes(iv);
-        cipher.init(Cipher.ENCRYPT_MODE, key(), new GCMParameterSpec(GCM_TAG_BITS, iv));
+        // Android Keystore must generate the IV when randomized encryption is
+        // required. Supplying our own causes CALLER_NONCE_PROHIBITED on real
+        // devices even when the IV came from SecureRandom.
+        cipher.init(Cipher.ENCRYPT_MODE, key());
+        byte[] iv = cipher.getIV();
+        if (iv == null || iv.length != IV_BYTES) {
+            throw new GeneralSecurityException("Android Keystore returned an invalid IV.");
+        }
         byte[] encrypted = cipher.doFinal(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         return Base64.encodeToString(iv, Base64.NO_WRAP) + "." + Base64.encodeToString(encrypted, Base64.NO_WRAP);
     }
