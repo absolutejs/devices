@@ -157,6 +157,8 @@ export type DeviceStorageCapability = {
 
 export type DeviceSecureStorageCapability = DeviceStorageCapability & {
   capability(): Promise<DeviceCapabilityStatus>;
+  /** Serialize a sensitive read/network/write exchange with native workers. */
+  withLock?<T>(key: string, run: () => Promise<T>): Promise<T>;
 };
 
 export type DeviceAdapter = {

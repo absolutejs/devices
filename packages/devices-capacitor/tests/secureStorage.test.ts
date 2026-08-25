@@ -13,7 +13,14 @@ const createPlugin = (
   },
 ) => {
   const values = new Map<string, string>([["unrelated", "keep"]]);
+  const leases = new Map<string, string>();
   const plugin: AbsoluteSecureStoragePlugin = {
+    acquireLease: async ({ key }) => {
+      if (leases.has(key)) return { leaseId: null };
+      const leaseId = crypto.randomUUID();
+      leases.set(key, leaseId);
+      return { leaseId };
+    },
     clear: async ({ prefix }) => {
       for (const key of values.keys())
         if (key.startsWith(prefix)) values.delete(key);
@@ -24,6 +31,9 @@ const createPlugin = (
     }),
     remove: async ({ key }) => {
       values.delete(key);
+    },
+    releaseLease: async ({ key, leaseId }) => {
+      if (leases.get(key) === leaseId) leases.delete(key);
     },
     set: async ({ key, value }) => {
       values.set(key, value);
@@ -83,5 +93,22 @@ describe("Capacitor secure storage", () => {
     );
     const storage = createCapacitorSecureStorage({ plugin });
     await expect(storage.get("")).rejects.toThrow("key cannot be empty");
+  });
+
+  test("serializes a credential exchange with native background work", async () => {
+    const { plugin } = createPlugin();
+    const storage = createCapacitorSecureStorage({ plugin });
+    let active = 0;
+    let maximumActive = 0;
+    const exchange = () =>
+      storage.withLock!("oidc.refresh", async () => {
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        active -= 1;
+      });
+
+    await Promise.all([exchange(), exchange()]);
+    expect(maximumActive).toBe(1);
   });
 });

@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name = 'AbsoluteDevicesCapacitor'
-  s.version = '0.0.1'
+  s.version = '0.1.3'
   s.summary = 'Capacitor runtime adapter and secure credential vault for AbsoluteJS.'
   s.license = { :type => 'BSL-1.1', :file => 'LICENSE' }
   s.homepage = 'https://github.com/absolutejs/devices'

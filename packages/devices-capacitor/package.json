@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/devices-capacitor",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Capacitor runtime adapter for @absolutejs/devices",
   "type": "module",
   "license": "BSL-1.1",
@@ -55,7 +55,7 @@
     "@capacitor/preferences": "^8.0.0"
   },
   "peerDependencies": {
-    "@absolutejs/devices": "^0.0.2",
+    "@absolutejs/devices": "^0.0.3",
     "@capacitor/core": ">=8 <9"
   },
   "devDependencies": {

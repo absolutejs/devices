@@ -13,6 +13,8 @@ public class AbsoluteSecureStoragePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "remove", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "keys", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clear", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "acquireLease", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "releaseLease", returnType: CAPPluginReturnPromise),
     ]
 
     private var service: String {
@@ -62,58 +64,45 @@ public class AbsoluteSecureStoragePlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func set(_ call: CAPPluginCall) {
         guard let key = requireText(call, "key") else { return }
-        guard let value = call.getString("value"), let data = value.data(using: .utf8) else {
+        guard let value = call.getString("value") else {
             call.reject("value is required.", "INVALID_ARGUMENT")
             return
         }
-        let existing = query(key)
-        let updateStatus = SecItemUpdate(existing as CFDictionary, [kSecValueData: data] as CFDictionary)
-        if updateStatus == errSecSuccess {
+        do {
+            if let leaseId = call.getString("leaseId") {
+                guard try AbsoluteSecureStorageVault.setIfLease(key, value: value, leaseId: leaseId) else {
+                    call.reject("Native secure-storage lease was lost.", "LEASE_LOST")
+                    return
+                }
+            } else {
+                try AbsoluteSecureStorageVault.set(key, value: value)
+            }
             call.resolve()
-            return
-        }
-        guard updateStatus == errSecItemNotFound else {
-            rejectStorage(call, updateStatus)
-            return
-        }
-        var addition = existing
-        addition[kSecValueData] = data
-        addition[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        let addStatus = SecItemAdd(addition as CFDictionary, nil)
-        if addStatus == errSecSuccess {
-            call.resolve()
-        } else {
-            rejectStorage(call, addStatus)
+        } catch {
+            call.reject("Native secure storage operation failed.", "STORAGE_FAILURE", error)
         }
     }
 
     @objc func get(_ call: CAPPluginCall) {
         guard let key = requireText(call, "key") else { return }
-        var request = query(key)
-        request[kSecReturnData] = kCFBooleanTrue
-        request[kSecMatchLimit] = kSecMatchLimitOne
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(request as CFDictionary, &result)
-        if status == errSecItemNotFound {
-            call.resolve(["value": NSNull()])
-            return
+        do {
+            if let value = try AbsoluteSecureStorageVault.get(key) {
+                call.resolve(["value": value])
+            } else {
+                call.resolve(["value": NSNull()])
+            }
+        } catch {
+            call.reject("Native secure storage operation failed.", "STORAGE_FAILURE", error)
         }
-        guard status == errSecSuccess,
-              let data = result as? Data,
-              let value = String(data: data, encoding: .utf8) else {
-            rejectStorage(call, status == errSecSuccess ? errSecDecode : status)
-            return
-        }
-        call.resolve(["value": value])
     }
 
     @objc func remove(_ call: CAPPluginCall) {
         guard let key = requireText(call, "key") else { return }
-        let status = SecItemDelete(query(key) as CFDictionary)
-        if status == errSecSuccess || status == errSecItemNotFound {
+        do {
+            try AbsoluteSecureStorageVault.remove(key)
             call.resolve()
-        } else {
-            rejectStorage(call, status)
+        } catch {
+            call.reject("Native secure storage operation failed.", "STORAGE_FAILURE", error)
         }
     }
 
@@ -159,6 +148,26 @@ public class AbsoluteSecureStoragePlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
         }
+        call.resolve()
+    }
+
+    @objc func acquireLease(_ call: CAPPluginCall) {
+        guard let key = requireText(call, "key") else { return }
+        let ttl = call.getInt("ttlMs") ?? 0
+        guard ttl >= 1_000 && ttl <= 120_000 else {
+            call.reject("ttlMs must be between 1000 and 120000.", "INVALID_ARGUMENT")
+            return
+        }
+        if let leaseId = AbsoluteSecureStorageVault.acquireLease(key, ttlMilliseconds: ttl) {
+            call.resolve(["leaseId": leaseId])
+        } else {
+            call.resolve(["leaseId": NSNull()])
+        }
+    }
+
+    @objc func releaseLease(_ call: CAPPluginCall) {
+        guard let key = requireText(call, "key"), let leaseId = requireText(call, "leaseId") else { return }
+        AbsoluteSecureStorageVault.releaseLease(key, leaseId: leaseId)
         call.resolve()
     }
 }
