@@ -77,7 +77,11 @@ public class AbsoluteSecureStoragePlugin extends Plugin {
 
     private SecretKey key() throws GeneralSecurityException {
         KeyStore store = KeyStore.getInstance(ANDROID_KEYSTORE);
-        store.load(null);
+        try {
+            store.load(null);
+        } catch (IOException error) {
+            throw new GeneralSecurityException("Unable to load Android Keystore.", error);
+        }
         SecretKey existing = (SecretKey) store.getKey(ALIAS, null);
         if (existing != null) return existing;
 
