@@ -275,6 +275,42 @@ export type DeviceLocalNotificationsCapability = DevicePermissionCapability & {
   ): Promise<DeviceLocalNotification>;
 };
 
+export type DevicePushNotificationData = Record<string, unknown>;
+
+export type DevicePushNotification = {
+  body?: string;
+  data: DevicePushNotificationData;
+  /** Provider notification identifier. This is not a device token. */
+  id: string;
+  native?: unknown;
+  subtitle?: string;
+  title?: string;
+};
+
+export type DevicePushNotificationAction = {
+  /** `tap` represents selecting the notification body. */
+  actionId: string;
+  inputValue?: string;
+  native?: unknown;
+  notification: DevicePushNotification;
+};
+
+/**
+ * Portable push-receipt surface. Provider registration credentials are kept
+ * behind the adapter boundary and are intentionally absent from this contract.
+ */
+export type DevicePushNotificationsCapability = DevicePermissionCapability & {
+  capability(): Promise<DeviceCapabilityStatus>;
+  disable(): Promise<void>;
+  enable(): Promise<void>;
+  onAction(
+    listener: (action: DevicePushNotificationAction) => void,
+  ): Promise<DeviceSubscription>;
+  onReceived(
+    listener: (notification: DevicePushNotification) => void,
+  ): Promise<DeviceSubscription>;
+};
+
 export type DeviceHapticImpactStyle = "heavy" | "light" | "medium";
 export type DeviceHapticNotificationType = "error" | "success" | "warning";
 
@@ -389,6 +425,7 @@ export type DeviceAdapter = {
   lifecycle: DeviceLifecycleCapability;
   links: DeviceLinksCapability;
   localNotifications?: DeviceLocalNotificationsCapability;
+  pushNotifications?: DevicePushNotificationsCapability;
   location?: DeviceLocationCapability;
   network: DeviceNetworkCapability;
   platform: DevicePlatformCapability;

@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/devices",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Provider-neutral device capability contracts and web, SSR, and test adapters for AbsoluteJS",
   "type": "module",
   "license": "BSL-1.1",

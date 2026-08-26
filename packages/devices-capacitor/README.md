@@ -22,6 +22,8 @@ The release-candidate adapter covers:
   bounded cache staging and deterministic cleanup.
 - opt-in Local Notifications with explicit permission, best-effort one-time
   scheduling, cancellation, pending inspection, and receipt/tap events.
+- opt-in Push Notifications through Capacitor 8.1.2, with provider tokens
+  confined to the generated authenticated registration bridge.
 
 `Preferences` is never used for credentials. On a native build the adapter
 selects `AbsoluteSecureStorage` automatically when Capacitor has registered the
@@ -49,6 +51,7 @@ import {
 import { createCapacitorHapticsCapability } from "@absolutejs/devices-capacitor/haptics";
 import { createCapacitorLocationCapability } from "@absolutejs/devices-capacitor/location";
 import { createCapacitorLocalNotificationsCapability } from "@absolutejs/devices-capacitor/local-notifications";
+import { createCapacitorPushNotificationsCapability } from "@absolutejs/devices-capacitor/push-notifications";
 import { createCapacitorDocumentsCapability } from "@absolutejs/devices-capacitor/documents";
 import { createCapacitorShareCapability } from "@absolutejs/devices-capacitor/share";
 ```
@@ -89,6 +92,15 @@ imports `localNotifications`; Android's display permission is projected from
 provider metadata. This first contract intentionally uses inexact best-effort
 schedules, so it does not request exact-alarm permissions or imply critical
 delivery. Notification content and data must never contain secrets.
+
+Push Notifications uses the official Capacitor 8.1.2 plugin. AbsoluteJS
+projects the Android 13 display permission, validates and copies the Firebase
+`google-services.json` for the configured application ID, adds the iOS APNs
+entitlement, and installs Capacitor's AppDelegate registration forwarding. Raw
+APNs/FCM tokens are accepted only by the adapter's internal registration sink;
+`@absolutejs/devices` application code cannot read them. The server returns an
+opaque installation identity that the shell retains in Keychain/Keystore for
+rotation and authenticated removal.
 
 The JavaScript contract and native sources are tested in CI; release acceptance
 still requires the real iOS/Android simulator checklist because native Keychain

@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/devices-capacitor",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Capacitor runtime adapter for @absolutejs/devices",
   "type": "module",
   "license": "BSL-1.1",
@@ -60,6 +60,10 @@
       "types": "./dist/localNotifications.d.ts",
       "import": "./dist/localNotifications.js"
     },
+    "./push-notifications": {
+      "types": "./dist/pushNotifications.d.ts",
+      "import": "./dist/pushNotifications.js"
+    },
     "./documents": {
       "types": "./dist/documents.d.ts",
       "import": "./dist/documents.js"
@@ -73,7 +77,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "bun build src/index.ts src/camera.ts src/clipboard.ts src/documents.ts src/haptics.ts src/localNotifications.ts src/location.ts src/share.ts --outdir dist --target=browser --external @absolutejs/devices --external @capacitor/core --external @capacitor/app --external @capacitor/browser --external @capacitor/camera --external @capacitor/clipboard --external @capacitor/file-viewer --external @capacitor/filesystem --external @capacitor/geolocation --external @capacitor/haptics --external @capacitor/local-notifications --external @capacitor/network --external @capacitor/preferences --external @capacitor/share && tsc --emitDeclarationOnly -p tsconfig.build.json",
+    "build": "bun build src/index.ts src/camera.ts src/clipboard.ts src/documents.ts src/haptics.ts src/localNotifications.ts src/location.ts src/pushNotifications.ts src/share.ts --root src --outdir dist --target=browser --external @absolutejs/devices --external @capacitor/core --external @capacitor/app --external @capacitor/browser --external @capacitor/camera --external @capacitor/clipboard --external @capacitor/file-viewer --external @capacitor/filesystem --external @capacitor/geolocation --external @capacitor/haptics --external @capacitor/local-notifications --external @capacitor/network --external @capacitor/preferences --external @capacitor/push-notifications --external @capacitor/share && tsc --emitDeclarationOnly -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -83,7 +87,7 @@
     "@capacitor/preferences": "^8.0.0"
   },
   "peerDependencies": {
-    "@absolutejs/devices": "^0.5.0",
+    "@absolutejs/devices": "^0.6.0",
     "@capacitor/camera": ">=8.1 <9",
     "@capacitor/clipboard": ">=8 <9",
     "@capacitor/core": ">=8 <9",
@@ -92,6 +96,7 @@
     "@capacitor/geolocation": ">=8.2 <9",
     "@capacitor/haptics": ">=8 <9",
     "@capacitor/local-notifications": ">=8.2 <8.3",
+    "@capacitor/push-notifications": ">=8.1 <9",
     "@capacitor/share": ">=8 <9"
   },
   "peerDependenciesMeta": {
@@ -116,6 +121,9 @@
     "@capacitor/local-notifications": {
       "optional": true
     },
+    "@capacitor/push-notifications": {
+      "optional": true
+    },
     "@capacitor/share": {
       "optional": true
     }
@@ -129,6 +137,7 @@
     "@capacitor/geolocation": "8.2.2",
     "@capacitor/haptics": "8.0.2",
     "@capacitor/local-notifications": "8.2.1",
+    "@capacitor/push-notifications": "8.1.2",
     "@capacitor/share": "8.0.1"
   },
   "absolutejs": {
@@ -214,6 +223,23 @@
               "permissions": [
                 "android.permission.POST_NOTIFICATIONS"
               ]
+            }
+          }
+        },
+        "pushNotifications": {
+          "factory": "createCapacitorPushNotificationsCapability",
+          "module": "@absolutejs/devices-capacitor/push-notifications",
+          "packages": [
+            "@capacitor/push-notifications@8.1.2"
+          ],
+          "native": {
+            "android": {
+              "permissions": [
+                "android.permission.POST_NOTIFICATIONS"
+              ]
+            },
+            "ios": {
+              "pushNotifications": true
             }
           }
         },

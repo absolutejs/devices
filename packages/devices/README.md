@@ -17,6 +17,8 @@ The pre-1.0 core includes:
   filesystem paths;
 - explicit-permission local notification scheduling, cancellation, pending
   inspection, receipt events, and tap/action events;
+- explicit-permission remote push enable/disable and normalized receipt/action
+  events without exposing provider registration tokens;
 - separate ordinary and secure-storage surfaces;
 - SSR-safe, standards-based web, and deterministic test adapters;
 - a reusable adapter conformance harness.
@@ -37,6 +39,7 @@ import {
   location,
   localNotifications,
   photos,
+  pushNotifications,
   share,
 } from "@absolutejs/devices";
 
@@ -54,6 +57,15 @@ if (permission.state === "granted") {
   const capture = await camera.takePhoto({ direction: "rear" });
   image.src = capture.webPath;
 }
+
+// Call from an intentional user action. The returned value contains no token;
+// AbsoluteJS registers the installation through its authenticated shell.
+await pushNotifications.enable();
+const removePushAction = await pushNotifications.onAction(
+  ({ notification }) => {
+    console.log(notification.data);
+  },
+);
 const [chosen] = await photos.pick({ limit: 1 });
 
 const notificationPermission = await localNotifications.requestPermission();
@@ -102,6 +114,13 @@ and custom-action registration from this first portable contract. Browser
 scheduling is an emulated, page-lifetime fallback and reports that it is not
 durable across reloads. Notification titles, bodies, and data may be visible on
 a locked device and must not contain credentials or other secrets.
+
+Remote push registration credentials never cross the public devices contract.
+On native AbsoluteJS builds the generated shell forwards them to the fixed,
+authenticated Auth registration route; the server owns installation identity,
+tenant, topics, provider delivery, and retirement. Permission remains explicit:
+importing the capability never prompts, and only `pushNotifications.enable()`
+may request permission.
 
 The installation registry is shared through the JavaScript realm, so
 independently built shell and page bundles still observe the same selected

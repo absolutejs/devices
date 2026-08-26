@@ -20,6 +20,7 @@ import {
   type DeviceHapticsCapability,
   type DeviceLocationCapability,
   type DeviceLocalNotificationsCapability,
+  type DevicePushNotificationsCapability,
   type DeviceNetworkStatus,
   type DevicePlatformInfo,
   type DevicePhotosCapability,
@@ -59,6 +60,7 @@ export type CapacitorDeviceAdapterOptions = {
   haptics?: DeviceHapticsCapability;
   location?: DeviceLocationCapability;
   localNotifications?: DeviceLocalNotificationsCapability;
+  pushNotifications?: DevicePushNotificationsCapability;
   photos?: DevicePhotosCapability;
   secureStorage?: DeviceSecureStorageCapability;
   share?: DeviceShareCapability;
@@ -259,6 +261,9 @@ export const createCapacitorDeviceAdapter = (
     ...(options.documents === undefined
       ? {}
       : { documents: options.documents }),
+    ...(options.pushNotifications === undefined
+      ? {}
+      : { pushNotifications: options.pushNotifications }),
     ...(options.camera === undefined ? {} : { camera: options.camera }),
     ...(options.haptics === undefined ? {} : { haptics: options.haptics }),
     platform: {

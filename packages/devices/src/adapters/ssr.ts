@@ -92,6 +92,27 @@ export const createSsrDeviceAdapter = (): DeviceAdapter => ({
       throw unavailable("Local notifications");
     },
   },
+  pushNotifications: {
+    capability: async () => ({
+      available: false,
+      reason: "unavailable",
+      message: "Push notifications are unavailable during server rendering.",
+    }),
+    disable: async () => undefined,
+    enable: async () => {
+      throw unavailable("Push notifications");
+    },
+    onAction: async () => noopSubscription(),
+    onReceived: async () => noopSubscription(),
+    queryPermission: async () => ({
+      canRequest: false,
+      state: "unavailable",
+    }),
+    requestPermission: async () => ({
+      canRequest: false,
+      state: "unavailable",
+    }),
+  },
   platform: {
     getInfo: async () => ({
       formFactor: "unknown",

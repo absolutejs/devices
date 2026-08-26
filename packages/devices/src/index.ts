@@ -21,6 +21,8 @@ import {
   type DeviceLocationWatchOptions,
   type DeviceLocalNotification,
   type DeviceLocalNotificationAction,
+  type DevicePushNotification,
+  type DevicePushNotificationAction,
   type DeviceScheduleLocalNotification,
   type DeviceShareContent,
   type DeviceSubscription,
@@ -211,6 +213,60 @@ export const localNotifications = {
     ).requestPermission(),
   schedule: async (notification: DeviceScheduleLocalNotification) =>
     (await requireGrantedLocalNotifications()).schedule(notification),
+};
+
+export const pushNotifications = {
+  capability: () =>
+    getDeviceAdapter().pushNotifications?.capability() ??
+    Promise.resolve(unavailableOptional("Push notifications")),
+  disable: () =>
+    requireOptional(
+      getDeviceAdapter().pushNotifications,
+      "Push notifications",
+    ).disable(),
+  enable: async () => {
+    const capability = requireOptional(
+      getDeviceAdapter().pushNotifications,
+      "Push notifications",
+    );
+    const current = await capability.queryPermission();
+    const permission =
+      current.state === "prompt"
+        ? await capability.requestPermission()
+        : current;
+    if (permission.state !== "granted")
+      throw new DeviceError(
+        permission.state === "unavailable"
+          ? "unavailable"
+          : permission.state === "blocked"
+            ? "permission-blocked"
+            : permission.state === "denied"
+              ? "permission-denied"
+              : "permission-required",
+        "Notification permission must be explicitly granted before enabling push notifications.",
+      );
+    return capability.enable();
+  },
+  onAction: (listener: (action: DevicePushNotificationAction) => void) =>
+    requireOptional(
+      getDeviceAdapter().pushNotifications,
+      "Push notifications",
+    ).onAction(listener),
+  onReceived: (listener: (notification: DevicePushNotification) => void) =>
+    requireOptional(
+      getDeviceAdapter().pushNotifications,
+      "Push notifications",
+    ).onReceived(listener),
+  permission: () =>
+    requireOptional(
+      getDeviceAdapter().pushNotifications,
+      "Push notifications",
+    ).queryPermission(),
+  requestPermission: () =>
+    requireOptional(
+      getDeviceAdapter().pushNotifications,
+      "Push notifications",
+    ).requestPermission(),
 };
 
 export const share = {
