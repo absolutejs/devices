@@ -17,8 +17,8 @@ This repository does not own emulator orchestration. Target provisioning, native
 
 The core implementation covers platform information, lifecycle/resume/restored
 operations, normalized links, network state, Android-style back events, ordinary
-key/value storage, clipboard, system sharing, haptics, and a deliberately
-separate secure-storage seam. Provider features are isolated, tree-shakeable
+key/value storage, clipboard, system sharing, haptics, local notifications, and
+a deliberately separate secure-storage seam. Provider features are isolated, tree-shakeable
 slices: an app that never imports `clipboard`, `share`, or `haptics` does not need
 the corresponding native plugin.
 

@@ -20,6 +20,8 @@ The release-candidate adapter covers:
   one-shot reads, watched updates, and deterministic cleanup.
 - opt-in Documents selection, native share/save export, and native preview with
   bounded cache staging and deterministic cleanup.
+- opt-in Local Notifications with explicit permission, best-effort one-time
+  scheduling, cancellation, pending inspection, and receipt/tap events.
 
 `Preferences` is never used for credentials. On a native build the adapter
 selects `AbsoluteSecureStorage` automatically when Capacitor has registered the
@@ -46,6 +48,7 @@ import {
 } from "@absolutejs/devices-capacitor/camera";
 import { createCapacitorHapticsCapability } from "@absolutejs/devices-capacitor/haptics";
 import { createCapacitorLocationCapability } from "@absolutejs/devices-capacitor/location";
+import { createCapacitorLocalNotificationsCapability } from "@absolutejs/devices-capacitor/local-notifications";
 import { createCapacitorDocumentsCapability } from "@absolutejs/devices-capacitor/documents";
 import { createCapacitorShareCapability } from "@absolutejs/devices-capacitor/share";
 ```
@@ -78,6 +81,14 @@ bootstrap, never claims background delivery, preserves approximate versus precis
 access, and maps disabled services, policy restriction, timeout, and provider
 failures into the shared device error vocabulary. Every successful watch returns
 an idempotent cleanup function that clears the native provider watch.
+
+Local Notifications uses the complete official Capacitor 8.2.1 release. The
+adapter checks permission before every schedule and never lets the provider
+prompt implicitly. AbsoluteJS installs the plugin only when application code
+imports `localNotifications`; Android's display permission is projected from
+provider metadata. This first contract intentionally uses inexact best-effort
+schedules, so it does not request exact-alarm permissions or imply critical
+delivery. Notification content and data must never contain secrets.
 
 The JavaScript contract and native sources are tested in CI; release acceptance
 still requires the real iOS/Android simulator checklist because native Keychain

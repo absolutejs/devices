@@ -4,6 +4,8 @@ import type {
   DeviceLifecycleState,
   DeviceLocationEvent,
   DeviceLocationPosition,
+  DeviceLocalNotification,
+  DeviceLocalNotificationAction,
   DeviceNetworkStatus,
   DevicePermissionCapability,
   DevicePermissionStatus,
@@ -16,7 +18,10 @@ import type {
   DeviceWriteDocumentOptions,
 } from "./contracts";
 import { DeviceError } from "./contracts";
-import { availableCapability } from "./capabilities";
+import {
+  availableCapability,
+  normalizeDeviceLocalNotification,
+} from "./capabilities";
 export * from "./conformance";
 
 export type TestDeviceController = {
@@ -26,18 +31,26 @@ export type TestDeviceController = {
   emitLink(url: string): void;
   emitLocation(position?: DeviceLocationPosition): void;
   emitLocationError(error?: DeviceError): void;
+  emitLocalNotification(id: number): void;
+  emitLocalNotificationAction(
+    id: number,
+    actionId?: string,
+    inputValue?: string,
+  ): void;
   emitNetwork(status: DeviceNetworkStatus): void;
   emitRestoredOperation(operation: DeviceRestoredOperation): void;
   clipboardText: string;
   cameraPermission: TestPermissionController;
   hapticEvents: string[];
   locationPermission: TestPermissionController;
+  notificationPermission: TestPermissionController;
   locations: DeviceLocationPosition[];
   pickedPhotos: DevicePhoto[];
   pickedDocuments: DeviceDocument[];
   exportedDocuments: DeviceWriteDocumentOptions[];
   openedDocuments: DeviceWriteDocumentOptions[];
   openedExternalUrls: string[];
+  pendingNotifications: DeviceLocalNotification[];
   sharedContent: DeviceShareContent[];
   secureStorage: Map<string, string>;
   storage: Map<string, string>;
@@ -100,6 +113,12 @@ export const createTestDeviceAdapter = (
   const linkListeners = new Set<(url: string) => void>();
   const networkListeners = new Set<(status: DeviceNetworkStatus) => void>();
   const locationListeners = new Set<(event: DeviceLocationEvent) => void>();
+  const notificationActionListeners = new Set<
+    (action: DeviceLocalNotificationAction) => void
+  >();
+  const notificationReceivedListeners = new Set<
+    (notification: DeviceLocalNotification) => void
+  >();
   const values = new Map<string, string>();
   const secureValues = new Map<string, string>();
   const openedExternalUrls: string[] = [];
@@ -113,6 +132,12 @@ export const createTestDeviceAdapter = (
     { canRequest: true, state: "prompt" },
     { canRequest: false, state: "granted" },
   );
+  const notificationPermission = createTestPermission(
+    { canRequest: true, state: "prompt" },
+    { canRequest: false, state: "granted" },
+  );
+  const pendingNotifications: DeviceLocalNotification[] = [];
+  const notificationHistory = new Map<number, DeviceLocalNotification>();
   const locations: DeviceLocationPosition[] = [
     {
       accuracyMeters: 5,
@@ -201,6 +226,55 @@ export const createTestDeviceAdapter = (
       },
       vibrate: async (durationMs = 300) => {
         hapticEvents.push(`vibrate:${durationMs}`);
+      },
+    },
+    localNotifications: {
+      cancel: async (ids) => {
+        const selected = new Set(ids);
+        for (
+          let index = pendingNotifications.length - 1;
+          index >= 0;
+          index -= 1
+        )
+          if (selected.has(pendingNotifications[index]!.id))
+            pendingNotifications.splice(index, 1);
+      },
+      capability: async () => availableCapability("emulated"),
+      onAction: async (listener) => {
+        notificationActionListeners.add(listener);
+        return () => {
+          notificationActionListeners.delete(listener);
+        };
+      },
+      onReceived: async (listener) => {
+        notificationReceivedListeners.add(listener);
+        return () => {
+          notificationReceivedListeners.delete(listener);
+        };
+      },
+      pending: async () => [...pendingNotifications],
+      queryPermission: notificationPermission.permission.queryPermission,
+      requestPermission: notificationPermission.permission.requestPermission,
+      schedule: async (input) => {
+        const permission =
+          await notificationPermission.permission.queryPermission();
+        if (permission.state !== "granted")
+          throw new DeviceError(
+            permission.state === "denied"
+              ? "permission-denied"
+              : permission.state === "blocked"
+                ? "permission-blocked"
+                : "permission-required",
+            "Notification permission must be explicitly granted before scheduling.",
+          );
+        const notification = normalizeDeviceLocalNotification(input);
+        const existing = pendingNotifications.findIndex(
+          ({ id }) => id === notification.id,
+        );
+        if (existing === -1) pendingNotifications.push(notification);
+        else pendingNotifications.splice(existing, 1, notification);
+        notificationHistory.set(notification.id, notification);
+        return notification;
       },
     },
     platform: {
@@ -342,6 +416,30 @@ export const createTestDeviceAdapter = (
       for (const listener of locationListeners)
         listener({ error, type: "error" });
     },
+    emitLocalNotification: (id) => {
+      const index = pendingNotifications.findIndex(
+        (notification) => notification.id === id,
+      );
+      const notification =
+        index === -1
+          ? notificationHistory.get(id)
+          : pendingNotifications.splice(index, 1)[0];
+      if (!notification)
+        throw new Error(`Unknown test local notification ${id}.`);
+      for (const listener of notificationReceivedListeners)
+        listener(notification);
+    },
+    emitLocalNotificationAction: (id, actionId = "tap", inputValue) => {
+      const notification = notificationHistory.get(id);
+      if (!notification)
+        throw new Error(`Unknown test local notification ${id}.`);
+      const action = {
+        actionId,
+        ...(inputValue === undefined ? {} : { inputValue }),
+        notification,
+      };
+      for (const listener of notificationActionListeners) listener(action);
+    },
     emitNetwork: (status) => {
       networkStatus = status;
       for (const listener of networkListeners) listener(status);
@@ -352,7 +450,9 @@ export const createTestDeviceAdapter = (
     hapticEvents,
     locationPermission,
     locations,
+    notificationPermission,
     openedExternalUrls,
+    pendingNotifications,
     exportedDocuments,
     pickedPhotos,
     pickedDocuments,

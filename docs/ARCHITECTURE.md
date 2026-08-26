@@ -41,7 +41,7 @@ The root facade remains import-only for applications and delegates to one instal
 adapter. `platform.info()`, `network.status()`, normalized launch/inbound links,
 lifecycle/resume/restored-operation listeners, and ordinary storage work without
 provider branches. Back interception, clipboard, sharing, haptics, foreground
-location, and secure
+location, local notifications, and secure
 storage are optional adapter features. Their capability queries return a
 discriminated unavailable result. Clipboard and sharing fail with a typed error
 when unavailable; haptic effects safely degrade to a no-op so tactile feedback
@@ -90,7 +90,9 @@ subpath, and exact tested native package version. AbsoluteJS owns source discove
 dependency installation, and generated bootstrap wiring. This keeps the manifest
 declarative and prevents a dependency package from executing installation code.
 
-Camera/photos and foreground location follow the same isolated-provider model.
+Camera/photos, foreground location, and local notifications follow the same
+isolated-provider model. Local scheduling is best-effort and deliberately omits
+exact-alarm permission from the portable first slice.
 Location exposes explicit approximate/precise permission, one-shot reads, and
 watched position/error events with mandatory cleanup. It does not imply
 background tracking: that would require a separate capability, native provider,

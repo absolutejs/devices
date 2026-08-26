@@ -11,6 +11,7 @@ import {
   lifecycle,
   links,
   location,
+  localNotifications,
   network,
   platform,
   photos,
@@ -151,6 +152,40 @@ describe("@absolutejs/devices runtime", () => {
     await remove();
     testDevice.emitLocation();
     expect(events).toEqual([51.5072]);
+  });
+
+  test("requires explicit notification permission and exposes deterministic events", async () => {
+    const testDevice = createTestDeviceAdapter();
+    cleanup = installDeviceAdapter(testDevice.adapter);
+    const received: number[] = [];
+    const actions: string[] = [];
+    const removeReceived = await localNotifications.onReceived((notification) =>
+      received.push(notification.id),
+    );
+    const removeAction = await localNotifications.onAction((action) =>
+      actions.push(`${action.notification.id}:${action.actionId}`),
+    );
+
+    await expect(
+      localNotifications.schedule({ body: "Ready", id: 17, title: "Report" }),
+    ).rejects.toMatchObject({ code: "permission-required" });
+    expect(testDevice.notificationPermission.requests).toBe(0);
+    await localNotifications.requestPermission();
+    await localNotifications.schedule({
+      body: "Ready",
+      data: { route: "/reports/17" },
+      id: 17,
+      title: "Report",
+    });
+    expect(await localNotifications.pending()).toHaveLength(1);
+    testDevice.emitLocalNotification(17);
+    testDevice.emitLocalNotificationAction(17);
+    expect(received).toEqual([17]);
+    expect(actions).toEqual(["17:tap"]);
+    expect(await localNotifications.pending()).toEqual([]);
+
+    await removeReceived();
+    await removeAction();
   });
 
   test("exposes resume, restored-operation, back, and external-link behavior", async () => {

@@ -29,6 +29,10 @@ const entries = [
     "createCapacitorLocationCapability",
   ],
   [
+    "../packages/devices-capacitor/dist/localNotifications.js",
+    "createCapacitorLocalNotificationsCapability",
+  ],
+  [
     "../packages/devices-capacitor/dist/share.js",
     "createCapacitorShareCapability",
   ],
@@ -48,6 +52,7 @@ for (const optionalPlugin of [
   "clipboard",
   "geolocation",
   "haptics",
+  "local-notifications",
   "share",
 ]) {
   if (baseAdapter.includes(`@capacitor/${optionalPlugin}`))

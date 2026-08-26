@@ -33,6 +33,15 @@ const installWebEnvironment = () => {
   const downloads: Array<{ name: string; url: string }> = [];
   const shared: ShareData[] = [];
   const vibrations: number[] = [];
+  const notifications: Array<{
+    body?: string;
+    data?: unknown;
+    onclick: (() => void) | null;
+    tag?: string;
+    title: string;
+  }> = [];
+  let notificationPermission: NotificationPermission = "default";
+  let notificationPermissionRequests = 0;
   let clipboardText = "";
   let href = "https://app.example.test/start?source=launch#top";
   let online = true;
@@ -178,6 +187,32 @@ const installWebEnvironment = () => {
   }));
   replaceGlobal("navigator", navigator);
   replaceGlobal(
+    "Notification",
+    class {
+      static get permission() {
+        return notificationPermission;
+      }
+      static async requestPermission() {
+        notificationPermissionRequests += 1;
+        notificationPermission = "granted";
+        return notificationPermission;
+      }
+      body?: string;
+      data?: unknown;
+      onclick: (() => void) | null = null;
+      tag?: string;
+      title: string;
+      constructor(
+        title: string,
+        options: { body?: string; data?: unknown; tag?: string } = {},
+      ) {
+        this.title = title;
+        Object.assign(this, options);
+        notifications.push(this);
+      }
+    },
+  );
+  replaceGlobal(
     "URL",
     class extends NativeUrl {
       static createObjectURL() {
@@ -191,6 +226,7 @@ const installWebEnvironment = () => {
     globalEvents.removeEventListener.bind(globalEvents),
   );
   replaceGlobal("window", {
+    focus: () => undefined,
     localStorage,
     open: (url: string) => {
       opened.push(url);
@@ -220,6 +256,10 @@ const installWebEnvironment = () => {
     downloads,
     captures,
     locationOptions,
+    notifications,
+    get notificationPermissionRequests() {
+      return notificationPermissionRequests;
+    },
     shared,
     vibrations,
   };
@@ -374,5 +414,53 @@ describe("web device adapter", () => {
       maximumAge: 1_000,
       timeout: 5_000,
     });
+  });
+
+  test("keeps browser notification permission explicit and reports emulated durability", async () => {
+    const environment = installWebEnvironment();
+    const adapter = createWebDeviceAdapter();
+
+    expect(await adapter.localNotifications?.capability()).toMatchObject({
+      available: true,
+      fidelity: "emulated",
+      native: { durableScheduling: false },
+    });
+    await expect(
+      adapter.localNotifications?.schedule({
+        body: "Ready",
+        id: 9,
+        title: "Report",
+      }),
+    ).rejects.toMatchObject({ code: "permission-required" });
+    expect(environment.notificationPermissionRequests).toBe(0);
+    await adapter.localNotifications?.requestPermission();
+    expect(environment.notificationPermissionRequests).toBe(1);
+
+    const actions: number[] = [];
+    await adapter.localNotifications?.onAction((action) =>
+      actions.push(action.notification.id),
+    );
+    await adapter.localNotifications?.schedule({
+      body: "Ready",
+      id: 9,
+      title: "Report",
+    });
+    environment.notifications[0]?.onclick?.();
+    expect(environment.notifications[0]).toMatchObject({
+      body: "Ready",
+      tag: "absolutejs:9",
+      title: "Report",
+    });
+    expect(actions).toEqual([9]);
+
+    await adapter.localNotifications?.schedule({
+      body: "Later",
+      id: 10,
+      scheduledAtMs: Date.now() + 10_000,
+      title: "Reminder",
+    });
+    expect(await adapter.localNotifications?.pending()).toHaveLength(1);
+    await adapter.localNotifications?.cancel([10]);
+    expect(await adapter.localNotifications?.pending()).toEqual([]);
   });
 });

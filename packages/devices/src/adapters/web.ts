@@ -12,11 +12,13 @@ import {
   type DeviceLocationPermissionStatus,
   type DeviceLocationPosition,
   type DeviceLocationWatchOptions,
+  type DeviceLocalNotification,
   type DevicePickDocumentsOptions,
   type DeviceWriteDocumentOptions,
 } from "../contracts";
 import {
   availableCapability,
+  normalizeDeviceLocalNotification,
   normalizeDeviceShareContent,
   unavailableCapability,
   validateDeviceLocationOptions,
@@ -419,6 +421,51 @@ const pickImages = async (options: {
 export const createWebDeviceAdapter = (): DeviceAdapter => {
   let cameraAuthorized = false;
   let locationAuthorized = false;
+  const notificationActions = new Set<
+    (action: {
+      actionId: string;
+      notification: DeviceLocalNotification;
+    }) => void
+  >();
+  const notificationReceived = new Set<
+    (notification: DeviceLocalNotification) => void
+  >();
+  const pendingNotifications = new Map<
+    number,
+    {
+      notification: DeviceLocalNotification;
+      timer: ReturnType<typeof setTimeout>;
+    }
+  >();
+
+  const notificationPermission = () => {
+    if (typeof Notification === "undefined")
+      return { canRequest: false, state: "unavailable" as const };
+    return Notification.permission === "granted"
+      ? { canRequest: false, state: "granted" as const }
+      : Notification.permission === "denied"
+        ? { canRequest: false, state: "denied" as const }
+        : { canRequest: true, state: "prompt" as const };
+  };
+
+  const showNotification = (notification: DeviceLocalNotification) => {
+    let displayed: Notification;
+    try {
+      displayed = new Notification(notification.title, {
+        body: notification.body,
+        data: notification.data,
+        tag: `absolutejs:${notification.id}`,
+      });
+    } catch (error) {
+      throw webFailure(error, "Browser notification display failed.");
+    }
+    for (const listener of notificationReceived) listener(notification);
+    displayed.onclick = () => {
+      for (const listener of notificationActions)
+        listener({ actionId: "tap", notification });
+      window.focus();
+    };
+  };
 
   const queryLocationPermission =
     async (): Promise<DeviceLocationPermissionStatus> => {
@@ -576,6 +623,89 @@ export const createWebDeviceAdapter = (): DeviceAdapter => {
         vibrate(type === "error" ? 40 : type === "warning" ? 28 : 18),
       selectionChanged: async () => vibrate(6),
       vibrate: async (durationMs = 300) => vibrate(durationMs),
+    },
+    localNotifications: {
+      cancel: async (ids) => {
+        for (const id of ids) {
+          const pending = pendingNotifications.get(id);
+          if (!pending) continue;
+          clearTimeout(pending.timer);
+          pendingNotifications.delete(id);
+        }
+      },
+      capability: async () =>
+        typeof Notification === "undefined"
+          ? unavailableCapability(
+              "unsupported",
+              "Browser notifications are unavailable.",
+            )
+          : availableCapability("emulated", {
+              durableScheduling: false,
+              maximumDelayMs: 2_147_483_647,
+            }),
+      onAction: async (listener) => {
+        notificationActions.add(listener);
+        return () => {
+          notificationActions.delete(listener);
+        };
+      },
+      onReceived: async (listener) => {
+        notificationReceived.add(listener);
+        return () => {
+          notificationReceived.delete(listener);
+        };
+      },
+      pending: async () =>
+        Array.from(
+          pendingNotifications.values(),
+          ({ notification }) => notification,
+        ),
+      queryPermission: async () => notificationPermission(),
+      requestPermission: async () => {
+        if (typeof Notification === "undefined")
+          return { canRequest: false, state: "unavailable" };
+        try {
+          await Notification.requestPermission();
+          return notificationPermission();
+        } catch (error) {
+          throw webFailure(error, "Browser notification permission failed.");
+        }
+      },
+      schedule: async (input) => {
+        const permission = notificationPermission();
+        if (permission.state !== "granted")
+          throw new DeviceError(
+            permission.state === "denied"
+              ? "permission-denied"
+              : permission.state === "unavailable"
+                ? "unavailable"
+                : "permission-required",
+            "Notification permission must be explicitly granted before scheduling.",
+          );
+        const notification = normalizeDeviceLocalNotification(input);
+        const delay = Math.max(
+          0,
+          (notification.scheduledAtMs ?? Date.now()) - Date.now(),
+        );
+        if (delay > 2_147_483_647)
+          throw new DeviceError(
+            "unsupported",
+            "Browser notification scheduling cannot exceed 24 days and is not durable across reloads.",
+          );
+        const existing = pendingNotifications.get(notification.id);
+        if (existing) clearTimeout(existing.timer);
+        if (delay === 0) {
+          pendingNotifications.delete(notification.id);
+          showNotification(notification);
+          return notification;
+        }
+        const timer = setTimeout(() => {
+          pendingNotifications.delete(notification.id);
+          showNotification(notification);
+        }, delay);
+        pendingNotifications.set(notification.id, { notification, timer });
+        return notification;
+      },
     },
     platform: {
       getInfo: async () => ({

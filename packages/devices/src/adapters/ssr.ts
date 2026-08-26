@@ -68,6 +68,30 @@ export const createSsrDeviceAdapter = (): DeviceAdapter => ({
     selectionChanged: async () => undefined,
     vibrate: async () => undefined,
   },
+  localNotifications: {
+    cancel: async () => {
+      throw unavailable("Local notifications");
+    },
+    capability: async () => ({
+      available: false,
+      reason: "unavailable",
+      message: "Local notifications are unavailable during server rendering.",
+    }),
+    onAction: async () => noopSubscription(),
+    onReceived: async () => noopSubscription(),
+    pending: async () => [],
+    queryPermission: async () => ({
+      canRequest: false,
+      state: "unavailable",
+    }),
+    requestPermission: async () => ({
+      canRequest: false,
+      state: "unavailable",
+    }),
+    schedule: async () => {
+      throw unavailable("Local notifications");
+    },
+  },
   platform: {
     getInfo: async () => ({
       formFactor: "unknown",

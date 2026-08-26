@@ -15,6 +15,8 @@ The pre-1.0 core includes:
   contracts;
 - bounded document selection, export, and preview without exposing native
   filesystem paths;
+- explicit-permission local notification scheduling, cancellation, pending
+  inspection, receipt events, and tap/action events;
 - separate ordinary and secure-storage surfaces;
 - SSR-safe, standards-based web, and deterministic test adapters;
 - a reusable adapter conformance harness.
@@ -33,6 +35,7 @@ import {
   documents,
   haptics,
   location,
+  localNotifications,
   photos,
   share,
 } from "@absolutejs/devices";
@@ -52,6 +55,16 @@ if (permission.state === "granted") {
   image.src = capture.webPath;
 }
 const [chosen] = await photos.pick({ limit: 1 });
+
+const notificationPermission = await localNotifications.requestPermission();
+if (notificationPermission.state === "granted") {
+  await localNotifications.schedule({
+    body: "Your report is ready.",
+    data: { route: "/reports/42" },
+    id: 42,
+    title: "AbsoluteJS",
+  });
+}
 
 const locationPermission = await location.requestPermission({
   precision: "coarse",
@@ -82,6 +95,13 @@ status reports `coarse`, `precise`, or `unknown` precision, and watch callbacks
 deliver typed position/error events. Background tracking is deliberately not
 included because it requires a separate privacy, battery, store-review, and
 native-lifecycle contract.
+
+Local notification IDs are stable positive 32-bit integers. Scheduling is
+best-effort and deliberately excludes repeating, exact-alarm, critical-alert,
+and custom-action registration from this first portable contract. Browser
+scheduling is an emulated, page-lifetime fallback and reports that it is not
+durable across reloads. Notification titles, bodies, and data may be visible on
+a locked device and must not contain credentials or other secrets.
 
 The installation registry is shared through the JavaScript realm, so
 independently built shell and page bundles still observe the same selected

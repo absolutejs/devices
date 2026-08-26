@@ -234,6 +234,47 @@ export type DeviceDocumentsCapability = {
   pick(options?: DevicePickDocumentsOptions): Promise<DeviceDocument[]>;
 };
 
+export type DeviceLocalNotificationData = Record<string, string>;
+
+export type DeviceLocalNotification = {
+  body: string;
+  data?: DeviceLocalNotificationData;
+  /** Stable positive 32-bit integer shared by web, iOS, and Android. */
+  id: number;
+  native?: unknown;
+  /** Best-effort delivery time as Unix milliseconds. Omit for immediate delivery. */
+  scheduledAtMs?: number;
+  title: string;
+};
+
+export type DeviceScheduleLocalNotification = Omit<
+  DeviceLocalNotification,
+  "native"
+>;
+
+export type DeviceLocalNotificationAction = {
+  /** `tap` represents selecting the notification body. */
+  actionId: string;
+  inputValue?: string;
+  native?: unknown;
+  notification: DeviceLocalNotification;
+};
+
+export type DeviceLocalNotificationsCapability = DevicePermissionCapability & {
+  capability(): Promise<DeviceCapabilityStatus>;
+  cancel(ids: number[]): Promise<void>;
+  onAction(
+    listener: (action: DeviceLocalNotificationAction) => void,
+  ): Promise<DeviceSubscription>;
+  onReceived(
+    listener: (notification: DeviceLocalNotification) => void,
+  ): Promise<DeviceSubscription>;
+  pending(): Promise<DeviceLocalNotification[]>;
+  schedule(
+    notification: DeviceScheduleLocalNotification,
+  ): Promise<DeviceLocalNotification>;
+};
+
 export type DeviceHapticImpactStyle = "heavy" | "light" | "medium";
 export type DeviceHapticNotificationType = "error" | "success" | "warning";
 
@@ -347,6 +388,7 @@ export type DeviceAdapter = {
   haptics?: DeviceHapticsCapability;
   lifecycle: DeviceLifecycleCapability;
   links: DeviceLinksCapability;
+  localNotifications?: DeviceLocalNotificationsCapability;
   location?: DeviceLocationCapability;
   network: DeviceNetworkCapability;
   platform: DevicePlatformCapability;

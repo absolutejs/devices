@@ -4,6 +4,7 @@ import {
   availableCapability,
   isDeviceError,
   normalizeDeviceError,
+  normalizeDeviceLocalNotification,
   runtimeCapability,
   unavailableCapability,
 } from "../src";
@@ -65,5 +66,34 @@ describe("device capability contracts", () => {
       state: "granted",
     });
     expect(permission.requests).toBe(1);
+  });
+
+  test("validates portable local notification payloads", () => {
+    expect(
+      normalizeDeviceLocalNotification({
+        body: "Your report is ready.",
+        data: { route: "/reports/42" },
+        id: 42,
+        scheduledAtMs: 1_777_000_000_000,
+        title: "AbsoluteJS",
+      }),
+    ).toEqual({
+      body: "Your report is ready.",
+      data: { route: "/reports/42" },
+      id: 42,
+      scheduledAtMs: 1_777_000_000_000,
+      title: "AbsoluteJS",
+    });
+    expect(() =>
+      normalizeDeviceLocalNotification({ body: "Body", id: 0, title: "Title" }),
+    ).toThrow(TypeError);
+    expect(() =>
+      normalizeDeviceLocalNotification({
+        body: "Body",
+        data: { invalid: 1 as unknown as string },
+        id: 1,
+        title: "Title",
+      }),
+    ).toThrow(TypeError);
   });
 });

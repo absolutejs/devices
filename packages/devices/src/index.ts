@@ -19,6 +19,9 @@ import {
   type DeviceLocationOptions,
   type DeviceLocationPermissionOptions,
   type DeviceLocationWatchOptions,
+  type DeviceLocalNotification,
+  type DeviceLocalNotificationAction,
+  type DeviceScheduleLocalNotification,
   type DeviceShareContent,
   type DeviceSubscription,
 } from "./contracts";
@@ -62,6 +65,27 @@ const requireGrantedLocation = async () => {
             ? "permission-denied"
             : "permission-required",
       "Location permission must be granted with location.requestPermission() before reading a position.",
+    );
+
+  return capability;
+};
+
+const requireGrantedLocalNotifications = async () => {
+  const capability = requireOptional(
+    getDeviceAdapter().localNotifications,
+    "Local notifications",
+  );
+  const permission = await capability.queryPermission();
+  if (permission.state !== "granted")
+    throw new DeviceError(
+      permission.state === "unavailable"
+        ? "unavailable"
+        : permission.state === "blocked"
+          ? "permission-blocked"
+          : permission.state === "denied"
+            ? "permission-denied"
+            : "permission-required",
+      "Notification permission must be granted with localNotifications.requestPermission() before scheduling.",
     );
 
   return capability;
@@ -149,6 +173,44 @@ export const haptics = {
     getDeviceAdapter().haptics?.selectionChanged() ?? Promise.resolve(),
   vibrate: (durationMs?: number) =>
     getDeviceAdapter().haptics?.vibrate(durationMs) ?? Promise.resolve(),
+};
+
+export const localNotifications = {
+  cancel: (ids: number[]) =>
+    requireOptional(
+      getDeviceAdapter().localNotifications,
+      "Local notifications",
+    ).cancel(ids),
+  capability: () =>
+    getDeviceAdapter().localNotifications?.capability() ??
+    Promise.resolve(unavailableOptional("Local notifications")),
+  onAction: (listener: (action: DeviceLocalNotificationAction) => void) =>
+    requireOptional(
+      getDeviceAdapter().localNotifications,
+      "Local notifications",
+    ).onAction(listener),
+  onReceived: (listener: (notification: DeviceLocalNotification) => void) =>
+    requireOptional(
+      getDeviceAdapter().localNotifications,
+      "Local notifications",
+    ).onReceived(listener),
+  pending: () =>
+    requireOptional(
+      getDeviceAdapter().localNotifications,
+      "Local notifications",
+    ).pending(),
+  permission: () =>
+    requireOptional(
+      getDeviceAdapter().localNotifications,
+      "Local notifications",
+    ).queryPermission(),
+  requestPermission: () =>
+    requireOptional(
+      getDeviceAdapter().localNotifications,
+      "Local notifications",
+    ).requestPermission(),
+  schedule: async (notification: DeviceScheduleLocalNotification) =>
+    (await requireGrantedLocalNotifications()).schedule(notification),
 };
 
 export const share = {
