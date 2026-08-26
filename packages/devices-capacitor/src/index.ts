@@ -15,6 +15,7 @@ import {
   unavailableCapability,
   type DeviceAdapter,
   type DeviceClipboardCapability,
+  type DeviceDocumentsCapability,
   type DeviceCameraCapability,
   type DeviceHapticsCapability,
   type DeviceLocationCapability,
@@ -53,6 +54,7 @@ export type CapacitorDeviceAdapterOptions = {
   bindings?: CapacitorDeviceBindings;
   camera?: DeviceCameraCapability;
   clipboard?: DeviceClipboardCapability;
+  documents?: DeviceDocumentsCapability;
   haptics?: DeviceHapticsCapability;
   location?: DeviceLocationCapability;
   photos?: DevicePhotosCapability;
@@ -252,6 +254,9 @@ export const createCapacitorDeviceAdapter = (
     ...(options.clipboard === undefined
       ? {}
       : { clipboard: options.clipboard }),
+    ...(options.documents === undefined
+      ? {}
+      : { documents: options.documents }),
     ...(options.camera === undefined ? {} : { camera: options.camera }),
     ...(options.haptics === undefined ? {} : { haptics: options.haptics }),
     platform: {

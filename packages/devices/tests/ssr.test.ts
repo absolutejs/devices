@@ -5,6 +5,7 @@ import {
   back,
   camera,
   clipboard,
+  documents,
   haptics,
   lifecycle,
   location,
@@ -51,6 +52,10 @@ describe("SSR adapter", () => {
         available: false,
         reason: "unavailable",
       });
+      expect(await documents.capability()).toMatchObject({
+        available: false,
+        reason: "unavailable",
+      });
       expect(await share.capability()).toMatchObject({
         available: false,
         reason: "unavailable",
@@ -82,6 +87,9 @@ describe("SSR adapter", () => {
       });
       await haptics.impact();
       await expect(clipboard.readText()).rejects.toMatchObject({
+        code: "unavailable",
+      });
+      await expect(documents.pick()).rejects.toMatchObject({
         code: "unavailable",
       });
       await expect(secureStorage.get("credential")).rejects.toMatchObject({

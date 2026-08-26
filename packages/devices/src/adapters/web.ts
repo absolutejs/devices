@@ -1,6 +1,9 @@
 import {
   DeviceError,
+  DEFAULT_DEVICE_DOCUMENT_MAX_BYTES,
   type DeviceAdapter,
+  type DeviceDocument,
+  type DeviceExportDocumentResult,
   type DeviceNetworkStatus,
   type DevicePlatformInfo,
   type DeviceSafeAreaInsets,
@@ -9,6 +12,8 @@ import {
   type DeviceLocationPermissionStatus,
   type DeviceLocationPosition,
   type DeviceLocationWatchOptions,
+  type DevicePickDocumentsOptions,
+  type DeviceWriteDocumentOptions,
 } from "../contracts";
 import {
   availableCapability,
@@ -103,6 +108,136 @@ const webOperation = async <T>(
     return await operation();
   } catch (error) {
     throw webFailure(error, message);
+  }
+};
+
+const requireMaximumBytes = (value?: number) => {
+  const maximumBytes = value ?? DEFAULT_DEVICE_DOCUMENT_MAX_BYTES;
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 1)
+    throw new TypeError(
+      "Document maximumBytes must be a positive safe integer.",
+    );
+  return maximumBytes;
+};
+
+const requireDocumentName = (name: string) => {
+  if (
+    name.length === 0 ||
+    name === "." ||
+    name === ".." ||
+    /[/\\\u0000-\u001f\u007f]/.test(name)
+  )
+    throw new TypeError("Document names must be safe leaf filenames.");
+  return name;
+};
+
+const requireDocumentAccept = (accept?: string[]) => {
+  if (accept === undefined) return undefined;
+  if (
+    accept.length === 0 ||
+    accept.some(
+      (value) =>
+        !/^\.[a-z0-9]+$/i.test(value) &&
+        !/^[a-z0-9!#$&^_.+-]+\/(?:[a-z0-9!#$&^_.+*-]+)$/i.test(value),
+    )
+  )
+    throw new TypeError(
+      "Document accept entries must be MIME types or file extensions.",
+    );
+  return accept.join(",");
+};
+
+const requireDocumentLimit = (limit?: number) => {
+  const value = limit ?? 1;
+  if (!Number.isSafeInteger(value) || value < 1)
+    throw new TypeError("Document limit must be a positive safe integer.");
+  return value;
+};
+
+const documentBlob = (options: DeviceWriteDocumentOptions) => {
+  requireDocumentName(options.name);
+  const mimeType =
+    options.mimeType ??
+    (options.content instanceof Blob && options.content.type
+      ? options.content.type
+      : typeof options.content === "string"
+        ? "text/plain;charset=utf-8"
+        : "application/octet-stream");
+  const blob =
+    options.content instanceof Blob
+      ? options.content
+      : new Blob([options.content], { type: mimeType });
+  if (blob.size > requireMaximumBytes(options.maximumBytes))
+    throw new DeviceError(
+      "failed",
+      `Document ${options.name} exceeds the configured byte limit.`,
+    );
+  return { blob, mimeType, name: options.name, sizeBytes: blob.size };
+};
+
+const releaseObjectUrl = (url: string) =>
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+
+const pickDocuments = async (
+  options: DevicePickDocumentsOptions = {},
+): Promise<DeviceDocument[]> => {
+  if (typeof document === "undefined" || !document.body)
+    throw new DeviceError(
+      "unsupported",
+      "Browser document selection is unavailable.",
+    );
+  const limit = requireDocumentLimit(options.limit);
+  const maximumBytes = requireMaximumBytes(options.maximumBytes);
+  const input = document.createElement("input");
+  input.type = "file";
+  input.multiple = limit > 1;
+  input.style.display = "none";
+  const accept = requireDocumentAccept(options.accept);
+  if (accept) input.accept = accept;
+  document.body.append(input);
+  try {
+    const files = await new Promise<File[]>((resolve, reject) => {
+      const cleanup = () => {
+        input.removeEventListener("change", changed);
+        input.removeEventListener("cancel", cancelled);
+      };
+      const changed = () => {
+        cleanup();
+        resolve(Array.from(input.files ?? []));
+      };
+      const cancelled = () => {
+        cleanup();
+        resolve([]);
+      };
+      input.addEventListener("change", changed, { once: true });
+      input.addEventListener("cancel", cancelled, { once: true });
+      try {
+        input.click();
+      } catch (error) {
+        cleanup();
+        reject(error);
+      }
+    });
+    if (files.length === 0)
+      throw new DeviceError("cancelled", "Document selection was cancelled.");
+    const selected = files.slice(0, limit);
+    const oversized = selected.find((file) => file.size > maximumBytes);
+    if (oversized)
+      throw new DeviceError(
+        "failed",
+        `Document ${oversized.name} exceeds the configured byte limit.`,
+      );
+    return selected.map((file) => ({
+      blob: file,
+      ...(Number.isFinite(file.lastModified)
+        ? { lastModifiedMs: file.lastModified }
+        : {}),
+      mimeType: file.type || "application/octet-stream",
+      name: file.name,
+      sizeBytes: file.size,
+    }));
+  } finally {
+    input.remove();
   }
 };
 
@@ -384,6 +519,48 @@ export const createWebDeviceAdapter = (): DeviceAdapter => {
           navigator.clipboard.writeText(value),
         );
       },
+    },
+    documents: {
+      capability: async () =>
+        typeof document !== "undefined" &&
+        typeof URL.createObjectURL === "function"
+          ? availableCapability("web")
+          : unavailableCapability(
+              "unsupported",
+              "Browser document handling is unavailable.",
+            ),
+      export: async (options): Promise<DeviceExportDocumentResult> => {
+        const result = documentBlob(options);
+        const url = URL.createObjectURL(result.blob);
+        try {
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = result.name;
+          anchor.rel = "noopener";
+          anchor.click();
+          return {
+            mimeType: result.mimeType,
+            name: result.name,
+            sizeBytes: result.sizeBytes,
+          };
+        } finally {
+          releaseObjectUrl(url);
+        }
+      },
+      open: async (options) => {
+        const result = documentBlob(options);
+        const url = URL.createObjectURL(result.blob);
+        const opened = window.open(url, "_blank", "noopener,noreferrer");
+        if (opened === null) {
+          URL.revokeObjectURL(url);
+          throw new DeviceError(
+            "failed",
+            "The browser blocked the document preview window.",
+          );
+        }
+        releaseObjectUrl(url);
+      },
+      pick: pickDocuments,
     },
     haptics: {
       capability: async () =>

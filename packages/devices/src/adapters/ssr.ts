@@ -41,6 +41,22 @@ export const createSsrDeviceAdapter = (): DeviceAdapter => ({
       throw unavailable("Clipboard");
     },
   },
+  documents: {
+    capability: async () => ({
+      available: false,
+      reason: "unavailable",
+      message: "Documents are unavailable during server rendering.",
+    }),
+    export: async () => {
+      throw unavailable("Documents");
+    },
+    open: async () => {
+      throw unavailable("Documents");
+    },
+    pick: async () => {
+      throw unavailable("Documents");
+    },
+  },
   haptics: {
     capability: async () => ({
       available: false,

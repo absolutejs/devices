@@ -183,6 +183,57 @@ export type DeviceShareCapability = {
   share(content: DeviceShareContent): Promise<DeviceShareResult>;
 };
 
+export const DEFAULT_DEVICE_DOCUMENT_MAX_BYTES = 64 * 1024 * 1024;
+
+export type DeviceDocumentOperation = "pick" | "export" | "open";
+
+export type DeviceDocument = {
+  blob: Blob;
+  lastModifiedMs?: number;
+  mimeType: string;
+  name: string;
+  sizeBytes: number;
+};
+
+export type DevicePickDocumentsOptions = {
+  /** MIME types or file extensions accepted by the system picker. */
+  accept?: string[];
+  /** Maximum number of documents returned. Defaults to one. */
+  limit?: number;
+  /** Per-document byte ceiling. Defaults to 64 MiB. */
+  maximumBytes?: number;
+};
+
+export type DeviceDocumentContent = Blob | string;
+
+export type DeviceWriteDocumentOptions = {
+  content: DeviceDocumentContent;
+  /** Safe leaf filename shown to the user. Paths are rejected. */
+  name: string;
+  mimeType?: string;
+  /** Content byte ceiling. Defaults to 64 MiB. */
+  maximumBytes?: number;
+};
+
+export type DeviceExportDocumentResult = {
+  activity?: string;
+  mimeType: string;
+  name: string;
+  native?: unknown;
+  sizeBytes: number;
+};
+
+export type DeviceDocumentsCapability = {
+  capability(
+    operation?: DeviceDocumentOperation,
+  ): Promise<DeviceCapabilityStatus>;
+  export(
+    options: DeviceWriteDocumentOptions,
+  ): Promise<DeviceExportDocumentResult>;
+  open(options: DeviceWriteDocumentOptions): Promise<void>;
+  pick(options?: DevicePickDocumentsOptions): Promise<DeviceDocument[]>;
+};
+
 export type DeviceHapticImpactStyle = "heavy" | "light" | "medium";
 export type DeviceHapticNotificationType = "error" | "success" | "warning";
 
@@ -292,6 +343,7 @@ export type DeviceAdapter = {
   back?: DeviceBackCapability;
   camera?: DeviceCameraCapability;
   clipboard?: DeviceClipboardCapability;
+  documents?: DeviceDocumentsCapability;
   haptics?: DeviceHapticsCapability;
   lifecycle: DeviceLifecycleCapability;
   links: DeviceLinksCapability;

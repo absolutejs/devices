@@ -10,6 +10,9 @@ import {
   type DevicePickPhotosOptions,
   type DeviceTakePhotoOptions,
   type DeviceClipboardOperation,
+  type DeviceDocumentOperation,
+  type DevicePickDocumentsOptions,
+  type DeviceWriteDocumentOptions,
   type DeviceHapticImpactStyle,
   type DeviceHapticNotificationType,
   type DeviceLocationEvent,
@@ -120,6 +123,18 @@ export const clipboard = {
       );
     return capability.writeText(value);
   },
+};
+
+export const documents = {
+  capability: (operation?: DeviceDocumentOperation) =>
+    getDeviceAdapter().documents?.capability(operation) ??
+    Promise.resolve(unavailableOptional("Documents")),
+  export: (options: DeviceWriteDocumentOptions) =>
+    requireOptional(getDeviceAdapter().documents, "Documents").export(options),
+  open: (options: DeviceWriteDocumentOptions) =>
+    requireOptional(getDeviceAdapter().documents, "Documents").open(options),
+  pick: (options?: DevicePickDocumentsOptions) =>
+    requireOptional(getDeviceAdapter().documents, "Documents").pick(options),
 };
 
 export const haptics = {

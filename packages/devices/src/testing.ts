@@ -12,6 +12,8 @@ import type {
   DeviceShareContent,
   DeviceShareResult,
   DevicePhoto,
+  DeviceDocument,
+  DeviceWriteDocumentOptions,
 } from "./contracts";
 import { DeviceError } from "./contracts";
 import { availableCapability } from "./capabilities";
@@ -32,6 +34,9 @@ export type TestDeviceController = {
   locationPermission: TestPermissionController;
   locations: DeviceLocationPosition[];
   pickedPhotos: DevicePhoto[];
+  pickedDocuments: DeviceDocument[];
+  exportedDocuments: DeviceWriteDocumentOptions[];
+  openedDocuments: DeviceWriteDocumentOptions[];
   openedExternalUrls: string[];
   sharedContent: DeviceShareContent[];
   secureStorage: Map<string, string>;
@@ -124,6 +129,17 @@ export const createTestDeviceAdapter = (
       webPath: "test://photo/1",
     },
   ];
+  const pickedDocuments: DeviceDocument[] = [
+    {
+      blob: new Blob(["test document"], { type: "text/plain" }),
+      lastModifiedMs: 1_777_000_000_000,
+      mimeType: "text/plain",
+      name: "test-document.txt",
+      sizeBytes: 13,
+    },
+  ];
+  const exportedDocuments: DeviceWriteDocumentOptions[] = [];
+  const openedDocuments: DeviceWriteDocumentOptions[] = [];
   let clipboardText = "";
   const adapter: DeviceAdapter = {
     runtime: "test",
@@ -147,6 +163,30 @@ export const createTestDeviceAdapter = (
       writeText: async (value) => {
         clipboardText = value;
       },
+    },
+    documents: {
+      capability: async () => availableCapability("emulated"),
+      export: async (document) => {
+        exportedDocuments.push(document);
+        const blob =
+          document.content instanceof Blob
+            ? document.content
+            : new Blob([document.content], {
+                type: document.mimeType ?? "text/plain;charset=utf-8",
+              });
+        return {
+          activity: "test",
+          mimeType:
+            document.mimeType || blob.type || "application/octet-stream",
+          name: document.name,
+          sizeBytes: blob.size,
+        };
+      },
+      open: async (document) => {
+        openedDocuments.push(document);
+      },
+      pick: async (pickOptions) =>
+        pickedDocuments.slice(0, pickOptions?.limit ?? 1),
     },
     haptics: {
       capability: async () => availableCapability("emulated"),
@@ -313,7 +353,10 @@ export const createTestDeviceAdapter = (
     locationPermission,
     locations,
     openedExternalUrls,
+    exportedDocuments,
     pickedPhotos,
+    pickedDocuments,
+    openedDocuments,
     secureStorage: secureValues,
     sharedContent,
     storage: values,

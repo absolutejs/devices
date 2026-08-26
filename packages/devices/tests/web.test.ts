@@ -30,6 +30,7 @@ const installWebEnvironment = () => {
   const documentEvents = new EventTarget();
   const values = new Map<string, string>();
   const opened: string[] = [];
+  const downloads: Array<{ name: string; url: string }> = [];
   const shared: ShareData[] = [];
   const vibrations: number[] = [];
   let clipboardText = "";
@@ -67,6 +68,17 @@ const installWebEnvironment = () => {
   const document = {
     body: { append: () => undefined },
     createElement: (tag: string) => {
+      if (tag === "a") {
+        const anchor = {
+          download: "",
+          href: "",
+          rel: "",
+          click() {
+            downloads.push({ name: anchor.download, url: anchor.href });
+          },
+        };
+        return anchor;
+      }
       if (tag !== "input")
         return { remove: () => undefined, style: { cssText: "" } };
       const events = new EventTarget();
@@ -171,6 +183,7 @@ const installWebEnvironment = () => {
       static createObjectURL() {
         return "blob:absolute-photo";
       }
+      static revokeObjectURL() {}
     },
   );
   replaceGlobal(
@@ -204,6 +217,7 @@ const installWebEnvironment = () => {
       );
     },
     opened,
+    downloads,
     captures,
     locationOptions,
     shared,
@@ -284,6 +298,41 @@ describe("web device adapter", () => {
     });
     expect(environment.captures).toEqual(["user"]);
     expect(await adapter.photos?.pick({ limit: 1 })).toHaveLength(1);
+  });
+
+  test("picks and exports bounded documents without exposing paths", async () => {
+    const environment = installWebEnvironment();
+    const adapter = createWebDeviceAdapter();
+
+    const picked = await adapter.documents?.pick({
+      accept: ["image/jpeg", ".pdf"],
+      limit: 1,
+    });
+    expect(picked?.[0]).toMatchObject({
+      mimeType: "image/jpeg",
+      name: "photo.jpg",
+      sizeBytes: 5,
+    });
+    expect(picked?.[0]?.blob).toBeInstanceOf(Blob);
+    expect(picked?.[0]).not.toHaveProperty("path");
+
+    await adapter.documents?.export({
+      content: "portable",
+      name: "report.txt",
+    });
+    expect(environment.downloads).toEqual([
+      { name: "report.txt", url: "blob:absolute-photo" },
+    ]);
+    await expect(
+      adapter.documents?.export({
+        content: "large",
+        maximumBytes: 2,
+        name: "x.txt",
+      }),
+    ).rejects.toMatchObject({ code: "failed" });
+    await expect(
+      adapter.documents?.export({ content: "unsafe", name: "../x.txt" }),
+    ).rejects.toBeInstanceOf(TypeError);
   });
 
   test("requests browser location explicitly and disposes watches", async () => {

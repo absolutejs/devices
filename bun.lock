@@ -27,6 +27,8 @@
         "@absolutejs/devices": "workspace:*",
         "@capacitor/camera": "8.2.3",
         "@capacitor/clipboard": "8.0.1",
+        "@capacitor/file-viewer": "2.0.2",
+        "@capacitor/filesystem": "8.1.3",
         "@capacitor/geolocation": "8.2.2",
         "@capacitor/haptics": "8.0.2",
         "@capacitor/share": "8.0.1",
@@ -36,6 +38,8 @@
         "@capacitor/camera": ">=8.1 <9",
         "@capacitor/clipboard": ">=8 <9",
         "@capacitor/core": ">=8 <9",
+        "@capacitor/file-viewer": ">=2 <3",
+        "@capacitor/filesystem": ">=8.1 <9",
         "@capacitor/geolocation": ">=8.2 <9",
         "@capacitor/haptics": ">=8 <9",
         "@capacitor/share": ">=8 <9",
@@ -43,6 +47,8 @@
       "optionalPeers": [
         "@capacitor/camera",
         "@capacitor/clipboard",
+        "@capacitor/file-viewer",
+        "@capacitor/filesystem",
         "@capacitor/geolocation",
         "@capacitor/haptics",
         "@capacitor/share",
@@ -63,6 +69,10 @@
     "@capacitor/clipboard": ["@capacitor/clipboard@8.0.1", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-iOlbTi8MojKyLnYE+M27priXid7vHd0PlDwyHohPzkuQ8Rkp6q7ykwZmPEUD+OnU/Ink7Qw/pUOfKgraKmA6Eg=="],
 
     "@capacitor/core": ["@capacitor/core@8.5.0", "", { "dependencies": { "tslib": "^2.1.0" } }, "sha512-Ca4krtqH1hothjtBIwf2J2TW7IhYq1ujp8QeItTiJohNsqij8ja2DYYH3DU0l8RmxCWaBAFTGA2TgOgOMCSNsQ=="],
+
+    "@capacitor/file-viewer": ["@capacitor/file-viewer@2.0.2", "", { "dependencies": { "@capacitor/synapse": "^1.0.4" }, "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-1D3X2bddNsNEC1WeXod2mnCMe8Iyv7nhVl2f0XCBABM9gJ65GoP5bqbIUiTZQDtGeNHlumg5EHpyvrWbqoyrfw=="],
+
+    "@capacitor/filesystem": ["@capacitor/filesystem@8.1.3", "", { "dependencies": { "@capacitor/synapse": "^1.0.4" }, "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-GNBlRkaXEEb+6WP/YsDXr2zygyOHoieuye6viyd2ZkEdBwfseG41jxfarVxLWH0r0owhyNUbwJ/Qi8fubqr6wA=="],
 
     "@capacitor/geolocation": ["@capacitor/geolocation@8.2.2", "", { "dependencies": { "@capacitor/synapse": "^1.0.4" }, "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-X8ryw6CfL4LspJnnfVL4++DUKKZVfdUIA9JljWVRljEDIQxZQZtz6xf7qstht+ymc+le6oa5EaUChVA6KsCYlA=="],
 

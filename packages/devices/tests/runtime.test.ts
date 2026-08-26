@@ -6,6 +6,7 @@ import {
   back,
   camera,
   clipboard,
+  documents,
   haptics,
   lifecycle,
   links,
@@ -105,6 +106,21 @@ describe("@absolutejs/devices runtime", () => {
     expect(testDevice.cameraPermission.requests).toBe(1);
     expect(await camera.takePhoto()).toEqual(testDevice.pickedPhotos[0]!);
     expect(await photos.pick({ limit: 1 })).toEqual(testDevice.pickedPhotos);
+  });
+
+  test("delegates provider-neutral document selection, export, and preview", async () => {
+    const testDevice = createTestDeviceAdapter();
+    cleanup = installDeviceAdapter(testDevice.adapter);
+
+    expect(await documents.pick()).toEqual(testDevice.pickedDocuments);
+    await documents.export({ content: "report", name: "report.txt" });
+    await documents.open({ content: "preview", name: "preview.txt" });
+    expect(testDevice.exportedDocuments).toHaveLength(1);
+    expect(testDevice.openedDocuments).toHaveLength(1);
+    expect(await documents.capability("open")).toMatchObject({
+      available: true,
+      fidelity: "emulated",
+    });
   });
 
   test("requires explicit location permission and cleans up watches", async () => {

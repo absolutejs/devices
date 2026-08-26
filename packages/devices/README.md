@@ -13,6 +13,8 @@ The pre-1.0 core includes:
 - provider-neutral clipboard, system-share, safely degrading haptic, explicit
   camera-permission, item-scoped photo-picker, and foreground location
   contracts;
+- bounded document selection, export, and preview without exposing native
+  filesystem paths;
 - separate ordinary and secure-storage surfaces;
 - SSR-safe, standards-based web, and deterministic test adapters;
 - a reusable adapter conformance harness.
@@ -28,6 +30,7 @@ Named imports are also the native provisioning declaration:
 import {
   camera,
   clipboard,
+  documents,
   haptics,
   location,
   photos,
@@ -37,6 +40,12 @@ import {
 await clipboard.writeText("Copied");
 await share.share({ text: "Hello from AbsoluteJS" });
 await haptics.impact("light");
+const [document] = await documents.pick({
+  accept: ["application/pdf", ".csv"],
+  limit: 1,
+});
+if (document) await upload(document.blob);
+await documents.export({ content: "Portable report", name: "report.txt" });
 const permission = await camera.requestPermission();
 if (permission.state === "granted") {
   const capture = await camera.takePhoto({ direction: "rear" });
@@ -60,6 +69,12 @@ if (locationPermission.state === "granted") {
 AbsoluteJS installs and wires the matching native provider slices during mobile
 initialization. Browser and SSR behavior remains standards-based and safe without
 application-side runtime branches.
+
+Documents default to a 64 MiB per-file ceiling, which can be lowered or raised
+explicitly with `maximumBytes`. Names must be leaf filenames: path separators,
+control characters, `.` and `..` are rejected. Picked files are returned as
+Blob-backed metadata and never include a native path. Browser export uses a
+download and browser preview uses a temporary object URL.
 
 Location is foreground-only. Capability and permission queries never prompt;
 `requestPermission()` must run from an intentional user action. The normalized

@@ -18,6 +18,8 @@ The release-candidate adapter covers:
   slices; and
 - opt-in foreground Geolocation with approximate/precise permission reporting,
   one-shot reads, watched updates, and deterministic cleanup.
+- opt-in Documents selection, native share/save export, and native preview with
+  bounded cache staging and deterministic cleanup.
 
 `Preferences` is never used for credentials. On a native build the adapter
 selects `AbsoluteSecureStorage` automatically when Capacitor has registered the
@@ -44,6 +46,7 @@ import {
 } from "@absolutejs/devices-capacitor/camera";
 import { createCapacitorHapticsCapability } from "@absolutejs/devices-capacitor/haptics";
 import { createCapacitorLocationCapability } from "@absolutejs/devices-capacitor/location";
+import { createCapacitorDocumentsCapability } from "@absolutejs/devices-capacitor/documents";
 import { createCapacitorShareCapability } from "@absolutejs/devices-capacitor/share";
 ```
 
@@ -55,6 +58,14 @@ permissions. Foreground location adds only coarse/fine Android permissions and
 the provider-required iOS usage strings. Users keep importing the
 provider-neutral facade only. The base
 entry does not import these plugins.
+
+Documents use the WebView's system-backed file input for scoped selection, so
+selected content remains Blob-backed and path-free. Export and preview stage a
+bounded file only in Capacitor's cache directory, call the official Share or
+File Viewer plugin, and then erase the staged file. AbsoluteJS generates and
+targets the Filesystem plugin's required Apple privacy manifest entry
+(`NSPrivacyAccessedAPICategoryFileTimestamp`, reason `C617.1`) from package
+metadata; users do not edit Xcode or `PrivacyInfo.xcprivacy`.
 
 Camera permission is never prompted implicitly: portable application code calls
 `camera.requestPermission()` from an intentional user action before
