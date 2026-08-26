@@ -29,7 +29,6 @@ import {
 import { createCapacitorSecureStorage } from "./secureStorage";
 
 export * from "./secureStorage";
-export * from "./camera";
 
 const COARSE_TABLET_MIN_WIDTH = 768;
 const DEFAULT_STORAGE_PREFIX = "absolutejs.devices.";
