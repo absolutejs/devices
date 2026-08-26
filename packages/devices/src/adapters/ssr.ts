@@ -13,6 +13,21 @@ const unavailable = (capability: string) =>
 
 export const createSsrDeviceAdapter = (): DeviceAdapter => ({
   runtime: "ssr",
+  camera: {
+    capability: async () => ({
+      available: false,
+      reason: "unavailable",
+      message: "Camera is unavailable during server rendering.",
+    }),
+    queryPermission: async () => ({ canRequest: false, state: "unavailable" }),
+    requestPermission: async () => ({
+      canRequest: false,
+      state: "unavailable",
+    }),
+    takePhoto: async () => {
+      throw unavailable("Camera");
+    },
+  },
   clipboard: {
     capability: async () => ({
       available: false,
@@ -63,6 +78,16 @@ export const createSsrDeviceAdapter = (): DeviceAdapter => ({
   network: {
     getStatus: async () => ({ connected: false, connectionType: "unknown" }),
     onChange: async () => noopSubscription(),
+  },
+  photos: {
+    capability: async () => ({
+      available: false,
+      reason: "unavailable",
+      message: "Photo picker is unavailable during server rendering.",
+    }),
+    pick: async () => {
+      throw unavailable("Photo picker");
+    },
   },
   share: {
     capability: async () => ({

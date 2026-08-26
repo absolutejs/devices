@@ -36,6 +36,8 @@ const installWebEnvironment = () => {
   let href = "https://app.example.test/start?source=launch#top";
   let online = true;
   let visibilityState: DocumentVisibilityState = "visible";
+  const captures: string[] = [];
+  const NativeUrl = URL;
   const localStorage = {
     clear: () => values.clear(),
     getItem: (key: string) => values.get(key) ?? null,
@@ -48,10 +50,25 @@ const installWebEnvironment = () => {
   } satisfies Storage;
   const document = {
     body: { append: () => undefined },
-    createElement: () => ({
-      remove: () => undefined,
-      style: { cssText: "" },
-    }),
+    createElement: (tag: string) => {
+      if (tag !== "input")
+        return { remove: () => undefined, style: { cssText: "" } };
+      const events = new EventTarget();
+      return Object.assign(events, {
+        accept: "",
+        click() {
+          events.dispatchEvent(new Event("change"));
+        },
+        files: [new File(["photo"], "photo.jpg", { type: "image/jpeg" })],
+        multiple: false,
+        remove: () => undefined,
+        setAttribute: (name: string, value: string) => {
+          if (name === "capture") captures.push(value);
+        },
+        style: { display: "" },
+        type: "",
+      });
+    },
     get visibilityState() {
       return visibilityState;
     },
@@ -106,6 +123,14 @@ const installWebEnvironment = () => {
   }));
   replaceGlobal("navigator", navigator);
   replaceGlobal(
+    "URL",
+    class extends NativeUrl {
+      static createObjectURL() {
+        return "blob:absolute-photo";
+      }
+    },
+  );
+  replaceGlobal(
     "removeEventListener",
     globalEvents.removeEventListener.bind(globalEvents),
   );
@@ -133,6 +158,7 @@ const installWebEnvironment = () => {
       );
     },
     opened,
+    captures,
     shared,
     vibrations,
   };
@@ -192,5 +218,24 @@ describe("web device adapter", () => {
       { text: "Portable", url: "https://absolutejs.com/path" },
     ]);
     expect(environment.vibrations).toEqual([24]);
+  });
+
+  test("uses item-scoped browser capture and photo selection", async () => {
+    const environment = installWebEnvironment();
+    const adapter = createWebDeviceAdapter();
+
+    expect(await adapter.camera?.requestPermission()).toEqual({
+      canRequest: false,
+      state: "granted",
+    });
+    expect(
+      await adapter.camera?.takePhoto({ direction: "front" }),
+    ).toMatchObject({
+      format: "jpeg",
+      name: "photo.jpg",
+      webPath: "blob:absolute-photo",
+    });
+    expect(environment.captures).toEqual(["user"]);
+    expect(await adapter.photos?.pick({ limit: 1 })).toHaveLength(1);
   });
 });

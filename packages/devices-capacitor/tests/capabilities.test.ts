@@ -2,6 +2,11 @@ import { describe, expect, mock, test } from "bun:test";
 import { createCapacitorClipboardCapability } from "../src/clipboard";
 import { createCapacitorHapticsCapability } from "../src/haptics";
 import { createCapacitorShareCapability } from "../src/share";
+import {
+  createCapacitorCameraCapability,
+  createCapacitorPhotosCapability,
+} from "../src/camera";
+import type { CameraPlugin } from "@capacitor/camera";
 
 const runtime = (plugins: string[]) => ({
   getPlatform: () => "ios",
@@ -10,6 +15,75 @@ const runtime = (plugins: string[]) => ({
 });
 
 describe("optional Capacitor capabilities", () => {
+  test("keeps camera permission explicit and gallery access picker-scoped", async () => {
+    let cameraPermission = "prompt" as const | "granted";
+    const takePhoto = mock(async () => ({
+      saved: false,
+      type: 0,
+      uri: "file:///capture.jpg",
+      webPath: "capacitor://capture.jpg",
+    }));
+    const chooseFromGallery = mock(async () => ({
+      results: [
+        {
+          saved: false,
+          type: 0,
+          uri: "file:///chosen.jpg",
+          webPath: "capacitor://chosen.jpg",
+        },
+      ],
+    }));
+    const requestPermissions = mock(async () => {
+      cameraPermission = "granted";
+      return { camera: cameraPermission, photos: "prompt" as const };
+    });
+    const cameraPlugin = {
+      checkPermissions: async () => ({
+        camera: cameraPermission,
+        photos: "prompt" as const,
+      }),
+      chooseFromGallery,
+      requestPermissions,
+      takePhoto,
+    } as unknown as CameraPlugin;
+    const bindings = {
+      camera: cameraPlugin,
+      capacitor: runtime(["Camera"]),
+    };
+    const camera = createCapacitorCameraCapability(bindings);
+    const photos = createCapacitorPhotosCapability(bindings);
+
+    await expect(camera.takePhoto()).rejects.toMatchObject({
+      code: "permission-required",
+    });
+    expect(takePhoto).not.toHaveBeenCalled();
+    expect(await camera.requestPermission()).toMatchObject({
+      state: "granted",
+    });
+    expect(requestPermissions).toHaveBeenCalledWith({
+      permissions: ["camera"],
+    });
+    expect(await camera.takePhoto({ direction: "front" })).toMatchObject({
+      uri: "file:///capture.jpg",
+      webPath: "capacitor://capture.jpg",
+    });
+    expect(takePhoto).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cameraDirection: "FRONT",
+        includeMetadata: false,
+        saveToGallery: false,
+      }),
+    );
+    expect(await photos.pick({ limit: 1 })).toHaveLength(1);
+    expect(chooseFromGallery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        allowMultipleSelection: false,
+        includeMetadata: false,
+        limit: 1,
+      }),
+    );
+  });
+
   test("normalizes clipboard text and fails closed without its plugin", async () => {
     let value = "initial";
     const clipboard = createCapacitorClipboardCapability({

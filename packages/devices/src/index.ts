@@ -7,6 +7,8 @@ import { getDeviceAdapter } from "./runtime";
 import { runtimeCapability, unavailableCapability } from "./capabilities";
 import {
   DeviceError,
+  type DevicePickPhotosOptions,
+  type DeviceTakePhotoOptions,
   type DeviceClipboardOperation,
   type DeviceHapticImpactStyle,
   type DeviceHapticNotificationType,
@@ -31,6 +33,48 @@ const unavailableOptional = (capability: string) =>
     "unsupported",
     `${capability} is not installed for this runtime.`,
   );
+
+const requireOptional = <T>(value: T | undefined, capability: string): T => {
+  if (value !== undefined) return value;
+  throw new DeviceError(
+    "unsupported",
+    `${capability} is not installed for this runtime.`,
+  );
+};
+
+export const camera = {
+  capability: () =>
+    getDeviceAdapter().camera?.capability() ??
+    Promise.resolve(unavailableOptional("Camera")),
+  permission: () =>
+    requireOptional(getDeviceAdapter().camera, "Camera").queryPermission(),
+  requestPermission: () =>
+    requireOptional(getDeviceAdapter().camera, "Camera").requestPermission(),
+  takePhoto: async (options?: DeviceTakePhotoOptions) => {
+    const capability = requireOptional(getDeviceAdapter().camera, "Camera");
+    const permission = await capability.queryPermission();
+    if (permission.state !== "granted")
+      throw new DeviceError(
+        permission.state === "unavailable"
+          ? "unavailable"
+          : permission.state === "blocked"
+            ? "permission-blocked"
+            : permission.state === "denied"
+              ? "permission-denied"
+              : "permission-required",
+        "Camera permission must be granted with camera.requestPermission() before taking a photo.",
+      );
+    return capability.takePhoto(options);
+  },
+};
+
+export const photos = {
+  capability: () =>
+    getDeviceAdapter().photos?.capability() ??
+    Promise.resolve(unavailableOptional("Photo picker")),
+  pick: (options?: DevicePickPhotosOptions) =>
+    requireOptional(getDeviceAdapter().photos, "Photo picker").pick(options),
+};
 
 export const clipboard = {
   capability: (operation?: DeviceClipboardOperation) =>

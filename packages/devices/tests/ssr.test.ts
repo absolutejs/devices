@@ -3,10 +3,12 @@ import { DeviceError } from "../src/contracts";
 import { createSsrDeviceAdapter } from "../src/adapters/ssr";
 import {
   back,
+  camera,
   clipboard,
   haptics,
   lifecycle,
   platform,
+  photos,
   secureStorage,
   share,
 } from "../src";
@@ -51,6 +53,20 @@ describe("SSR adapter", () => {
       expect(await share.capability()).toMatchObject({
         available: false,
         reason: "unavailable",
+      });
+      expect(await camera.capability()).toMatchObject({
+        available: false,
+        reason: "unavailable",
+      });
+      expect(await photos.capability()).toMatchObject({
+        available: false,
+        reason: "unavailable",
+      });
+      await expect(camera.takePhoto()).rejects.toMatchObject({
+        code: "unavailable",
+      });
+      await expect(photos.pick()).rejects.toMatchObject({
+        code: "unavailable",
       });
       await haptics.impact();
       await expect(clipboard.readText()).rejects.toMatchObject({

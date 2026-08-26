@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/devices-capacitor",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Capacitor runtime adapter for @absolutejs/devices",
   "type": "module",
   "license": "BSL-1.1",
@@ -44,6 +44,10 @@
       "types": "./dist/clipboard.d.ts",
       "import": "./dist/clipboard.js"
     },
+    "./camera": {
+      "types": "./dist/camera.d.ts",
+      "import": "./dist/camera.js"
+    },
     "./haptics": {
       "types": "./dist/haptics.d.ts",
       "import": "./dist/haptics.js"
@@ -57,7 +61,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "bun build src/index.ts src/clipboard.ts src/haptics.ts src/share.ts --outdir dist --target=browser --external @absolutejs/devices --external @capacitor/core --external @capacitor/app --external @capacitor/browser --external @capacitor/clipboard --external @capacitor/haptics --external @capacitor/network --external @capacitor/preferences --external @capacitor/share && tsc --emitDeclarationOnly -p tsconfig.build.json",
+    "build": "bun build src/index.ts src/camera.ts src/clipboard.ts src/haptics.ts src/share.ts --outdir dist --target=browser --external @absolutejs/devices --external @capacitor/core --external @capacitor/app --external @capacitor/browser --external @capacitor/camera --external @capacitor/clipboard --external @capacitor/haptics --external @capacitor/network --external @capacitor/preferences --external @capacitor/share && tsc --emitDeclarationOnly -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -67,13 +71,17 @@
     "@capacitor/preferences": "^8.0.0"
   },
   "peerDependencies": {
-    "@absolutejs/devices": "^0.1.0",
+    "@absolutejs/devices": "^0.2.0",
+    "@capacitor/camera": ">=8.1 <9",
     "@capacitor/clipboard": ">=8 <9",
     "@capacitor/core": ">=8 <9",
     "@capacitor/haptics": ">=8 <9",
     "@capacitor/share": ">=8 <9"
   },
   "peerDependenciesMeta": {
+    "@capacitor/camera": {
+      "optional": true
+    },
     "@capacitor/clipboard": {
       "optional": true
     },
@@ -86,6 +94,7 @@
   },
   "devDependencies": {
     "@absolutejs/devices": "workspace:*",
+    "@capacitor/camera": "8.2.3",
     "@capacitor/clipboard": "8.0.1",
     "@capacitor/haptics": "8.0.2",
     "@capacitor/share": "8.0.1"
@@ -93,6 +102,22 @@
   "absolutejs": {
     "devices": {
       "capabilities": {
+        "camera": {
+          "factory": "createCapacitorCameraCapability",
+          "module": "@absolutejs/devices-capacitor/camera",
+          "packages": [
+            "@capacitor/camera@8.2.3"
+          ],
+          "native": {
+            "ios": {
+              "usageDescriptions": [
+                "camera",
+                "photo-library",
+                "photo-library-add"
+              ]
+            }
+          }
+        },
         "clipboard": {
           "factory": "createCapacitorClipboardCapability",
           "module": "@absolutejs/devices-capacitor/clipboard",
@@ -106,6 +131,22 @@
           "packages": [
             "@capacitor/haptics@8.0.2"
           ]
+        },
+        "photos": {
+          "factory": "createCapacitorPhotosCapability",
+          "module": "@absolutejs/devices-capacitor/camera",
+          "packages": [
+            "@capacitor/camera@8.2.3"
+          ],
+          "native": {
+            "ios": {
+              "usageDescriptions": [
+                "camera",
+                "photo-library",
+                "photo-library-add"
+              ]
+            }
+          }
         },
         "share": {
           "factory": "createCapacitorShareCapability",

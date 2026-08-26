@@ -5,6 +5,7 @@ import {
   type DevicePlatformInfo,
   type DeviceSafeAreaInsets,
   type DeviceShareContent,
+  type DevicePhoto,
 } from "../contracts";
 import {
   availableCapability,
@@ -133,137 +134,266 @@ const vibrate = (durationMs: number) => {
   if (typeof navigator.vibrate === "function") navigator.vibrate(durationMs);
 };
 
-export const createWebDeviceAdapter = (): DeviceAdapter => ({
-  runtime: "web",
-  clipboard: {
-    capability: async (operation = "write") => clipboardStatus(operation),
-    readText: async () => {
-      if (!clipboardStatus("read").available)
-        throw new DeviceError("unsupported", "Clipboard read is unavailable.");
-      return webOperation("Browser clipboard read was denied.", () =>
-        navigator.clipboard.readText(),
-      );
-    },
-    writeText: async (value) => {
-      if (!clipboardStatus("write").available)
-        throw new DeviceError("unsupported", "Clipboard write is unavailable.");
-      await webOperation("Browser clipboard write was denied.", () =>
-        navigator.clipboard.writeText(value),
-      );
-    },
-  },
-  haptics: {
-    capability: async () =>
-      typeof navigator.vibrate === "function"
-        ? availableCapability("web")
-        : unavailableCapability(
-            "unsupported",
-            "Vibration feedback is not supported by this browser.",
-          ),
-    impact: async (style = "medium") =>
-      vibrate(style === "light" ? 8 : style === "heavy" ? 24 : 14),
-    notification: async (type = "success") =>
-      vibrate(type === "error" ? 40 : type === "warning" ? 28 : 18),
-    selectionChanged: async () => vibrate(6),
-    vibrate: async (durationMs = 300) => vibrate(durationMs),
-  },
-  platform: {
-    getInfo: async () => ({
-      formFactor: matches("(pointer: coarse)")
-        ? innerWidth >= COARSE_TABLET_MIN_WIDTH
-          ? "tablet"
-          : "phone"
-        : "desktop",
-      isNative: false,
-      language: navigator.language,
-      locale: Intl.DateTimeFormat().resolvedOptions().locale,
-      os: detectOs(),
-      prefersReducedMotion: matches("(prefers-reduced-motion: reduce)"),
-      runtime: "web",
-      safeAreaInsets: safeAreaInsets(),
-    }),
-  },
-  lifecycle: {
-    getState: async () =>
-      document.visibilityState === "visible" ? "active" : "background",
-    onChange: async (listener) => {
-      const handler = () =>
-        listener(
-          document.visibilityState === "visible" ? "active" : "background",
-        );
-      document.addEventListener("visibilitychange", handler);
-      return () => document.removeEventListener("visibilitychange", handler);
-    },
-    onRestoredOperation: async () => () => undefined,
-    onResume: async (listener) => {
-      const handler = () => {
-        if (document.visibilityState === "visible") listener();
+const requirePhotoOptions = (options?: {
+  limit?: number;
+  transform?: { height: number; quality?: number; width: number };
+}) => {
+  if (
+    options?.limit !== undefined &&
+    (!Number.isInteger(options.limit) || options.limit < 1)
+  )
+    throw new TypeError("Photo picker limit must be a positive integer.");
+  const transform = options?.transform;
+  if (
+    transform &&
+    (!Number.isInteger(transform.width) ||
+      transform.width < 1 ||
+      !Number.isInteger(transform.height) ||
+      transform.height < 1 ||
+      (transform.quality !== undefined &&
+        (!Number.isInteger(transform.quality) ||
+          transform.quality < 0 ||
+          transform.quality > 100)))
+  )
+    throw new TypeError(
+      "Photo transforms require positive integer dimensions and quality from 0 to 100.",
+    );
+};
+
+const pickImages = async (options: {
+  capture?: "environment" | "user";
+  limit?: number;
+  multiple?: boolean;
+}): Promise<DevicePhoto[]> => {
+  if (
+    typeof document === "undefined" ||
+    typeof URL.createObjectURL !== "function"
+  )
+    throw new DeviceError(
+      "unsupported",
+      "Browser photo selection is unavailable.",
+    );
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.multiple = options.multiple ?? false;
+  if (options.capture) input.setAttribute("capture", options.capture);
+  input.style.display = "none";
+  document.body?.append(input);
+  try {
+    const files = await new Promise<File[]>((resolve, reject) => {
+      const finish = (selected: File[]) => {
+        input.removeEventListener("change", changed);
+        input.removeEventListener("cancel", cancelled);
+        resolve(selected);
       };
-      document.addEventListener("visibilitychange", handler);
-      return () => document.removeEventListener("visibilitychange", handler);
-    },
-  },
-  links: {
-    getLaunchUrl: async () => location.href,
-    onOpen: async (listener) => {
-      let lastUrl = location.href;
-      const handler = () => {
-        if (location.href === lastUrl) return;
-        lastUrl = location.href;
-        listener(lastUrl);
-      };
-      addEventListener("popstate", handler);
-      addEventListener("hashchange", handler);
-      return () => {
-        removeEventListener("popstate", handler);
-        removeEventListener("hashchange", handler);
-      };
-    },
-    openExternal: async (url) => {
-      const parsed = new URL(url);
-      if (!["http:", "https:", "mailto:", "tel:"].includes(parsed.protocol)) {
-        throw new DeviceError(
-          "failed",
-          `External URL protocol ${parsed.protocol} is not allowed.`,
-        );
+      const changed = () => finish(Array.from(input.files ?? []));
+      const cancelled = () => finish([]);
+      input.addEventListener("change", changed, { once: true });
+      input.addEventListener("cancel", cancelled, { once: true });
+      try {
+        input.click();
+      } catch (error) {
+        reject(error);
       }
-      window.open(parsed.href, "_blank", "noopener,noreferrer");
+    });
+    if (files.length === 0)
+      throw new DeviceError("cancelled", "Photo selection was cancelled.");
+    return files.slice(0, options.limit).map((file) => ({
+      ...(file.type ? { format: file.type.replace(/^image\//, "") } : {}),
+      name: file.name,
+      sizeBytes: file.size,
+      webPath: URL.createObjectURL(file),
+    }));
+  } finally {
+    input.remove();
+  }
+};
+
+export const createWebDeviceAdapter = (): DeviceAdapter => {
+  let cameraAuthorized = false;
+
+  return {
+    runtime: "web",
+    camera: {
+      capability: async () =>
+        typeof document !== "undefined"
+          ? availableCapability("web")
+          : unavailableCapability(
+              "unsupported",
+              "Browser camera capture is unavailable.",
+            ),
+      // File-input capture is item-scoped rather than a durable browser grant. We
+      // still preserve the facade's explicit-request invariant for portable code.
+      queryPermission: async () => ({
+        canRequest: !cameraAuthorized,
+        state: cameraAuthorized ? "granted" : "prompt",
+      }),
+      requestPermission: async () => {
+        cameraAuthorized = true;
+        return { canRequest: false, state: "granted" };
+      },
+      takePhoto: async (options) => {
+        requirePhotoOptions(options);
+        return (
+          await pickImages({
+            capture: options?.direction === "front" ? "user" : "environment",
+          })
+        )[0]!;
+      },
     },
-  },
-  network: {
-    getStatus: async () => networkStatus(),
-    onChange: async (listener) => {
-      const handler = () => listener(networkStatus());
-      addEventListener("online", handler);
-      addEventListener("offline", handler);
-      return () => {
-        removeEventListener("online", handler);
-        removeEventListener("offline", handler);
-      };
+    clipboard: {
+      capability: async (operation = "write") => clipboardStatus(operation),
+      readText: async () => {
+        if (!clipboardStatus("read").available)
+          throw new DeviceError(
+            "unsupported",
+            "Clipboard read is unavailable.",
+          );
+        return webOperation("Browser clipboard read was denied.", () =>
+          navigator.clipboard.readText(),
+        );
+      },
+      writeText: async (value) => {
+        if (!clipboardStatus("write").available)
+          throw new DeviceError(
+            "unsupported",
+            "Clipboard write is unavailable.",
+          );
+        await webOperation("Browser clipboard write was denied.", () =>
+          navigator.clipboard.writeText(value),
+        );
+      },
     },
-  },
-  share: {
-    capability: async (content) => shareStatus(content),
-    share: async (content) => {
-      const normalized = normalizeDeviceShareContent(content);
-      if (!shareStatus(normalized).available)
-        throw new DeviceError("unsupported", "Web sharing is unavailable.");
-      await webOperation("Browser sharing failed.", () =>
-        navigator.share(normalized),
-      );
-      return {};
+    haptics: {
+      capability: async () =>
+        typeof navigator.vibrate === "function"
+          ? availableCapability("web")
+          : unavailableCapability(
+              "unsupported",
+              "Vibration feedback is not supported by this browser.",
+            ),
+      impact: async (style = "medium") =>
+        vibrate(style === "light" ? 8 : style === "heavy" ? 24 : 14),
+      notification: async (type = "success") =>
+        vibrate(type === "error" ? 40 : type === "warning" ? 28 : 18),
+      selectionChanged: async () => vibrate(6),
+      vibrate: async (durationMs = 300) => vibrate(durationMs),
     },
-  },
-  storage: {
-    clear: async () => requireStorage().clear(),
-    get: async (key) => requireStorage().getItem(key),
-    keys: async () => {
-      const storage = requireStorage();
-      return Array.from({ length: storage.length }, (_, index) =>
-        storage.key(index),
-      ).filter((key): key is string => key !== null);
+    platform: {
+      getInfo: async () => ({
+        formFactor: matches("(pointer: coarse)")
+          ? innerWidth >= COARSE_TABLET_MIN_WIDTH
+            ? "tablet"
+            : "phone"
+          : "desktop",
+        isNative: false,
+        language: navigator.language,
+        locale: Intl.DateTimeFormat().resolvedOptions().locale,
+        os: detectOs(),
+        prefersReducedMotion: matches("(prefers-reduced-motion: reduce)"),
+        runtime: "web",
+        safeAreaInsets: safeAreaInsets(),
+      }),
     },
-    remove: async (key) => requireStorage().removeItem(key),
-    set: async (key, value) => requireStorage().setItem(key, value),
-  },
-});
+    lifecycle: {
+      getState: async () =>
+        document.visibilityState === "visible" ? "active" : "background",
+      onChange: async (listener) => {
+        const handler = () =>
+          listener(
+            document.visibilityState === "visible" ? "active" : "background",
+          );
+        document.addEventListener("visibilitychange", handler);
+        return () => document.removeEventListener("visibilitychange", handler);
+      },
+      onRestoredOperation: async () => () => undefined,
+      onResume: async (listener) => {
+        const handler = () => {
+          if (document.visibilityState === "visible") listener();
+        };
+        document.addEventListener("visibilitychange", handler);
+        return () => document.removeEventListener("visibilitychange", handler);
+      },
+    },
+    links: {
+      getLaunchUrl: async () => location.href,
+      onOpen: async (listener) => {
+        let lastUrl = location.href;
+        const handler = () => {
+          if (location.href === lastUrl) return;
+          lastUrl = location.href;
+          listener(lastUrl);
+        };
+        addEventListener("popstate", handler);
+        addEventListener("hashchange", handler);
+        return () => {
+          removeEventListener("popstate", handler);
+          removeEventListener("hashchange", handler);
+        };
+      },
+      openExternal: async (url) => {
+        const parsed = new URL(url);
+        if (!["http:", "https:", "mailto:", "tel:"].includes(parsed.protocol)) {
+          throw new DeviceError(
+            "failed",
+            `External URL protocol ${parsed.protocol} is not allowed.`,
+          );
+        }
+        window.open(parsed.href, "_blank", "noopener,noreferrer");
+      },
+    },
+    network: {
+      getStatus: async () => networkStatus(),
+      onChange: async (listener) => {
+        const handler = () => listener(networkStatus());
+        addEventListener("online", handler);
+        addEventListener("offline", handler);
+        return () => {
+          removeEventListener("online", handler);
+          removeEventListener("offline", handler);
+        };
+      },
+    },
+    photos: {
+      capability: async () =>
+        typeof document !== "undefined"
+          ? availableCapability("web")
+          : unavailableCapability(
+              "unsupported",
+              "Browser photo selection is unavailable.",
+            ),
+      pick: async (options) => {
+        requirePhotoOptions(options);
+        return pickImages({
+          limit: options?.limit,
+          multiple: options?.limit !== 1,
+        });
+      },
+    },
+    share: {
+      capability: async (content) => shareStatus(content),
+      share: async (content) => {
+        const normalized = normalizeDeviceShareContent(content);
+        if (!shareStatus(normalized).available)
+          throw new DeviceError("unsupported", "Web sharing is unavailable.");
+        await webOperation("Browser sharing failed.", () =>
+          navigator.share(normalized),
+        );
+        return {};
+      },
+    },
+    storage: {
+      clear: async () => requireStorage().clear(),
+      get: async (key) => requireStorage().getItem(key),
+      keys: async () => {
+        const storage = requireStorage();
+        return Array.from({ length: storage.length }, (_, index) =>
+          storage.key(index),
+        ).filter((key): key is string => key !== null);
+      },
+      remove: async (key) => requireStorage().removeItem(key),
+      set: async (key, value) => requireStorage().setItem(key, value),
+    },
+  };
+};

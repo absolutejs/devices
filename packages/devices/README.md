@@ -10,7 +10,8 @@ The pre-1.0 core includes:
 - shared permission states without implicit permission requests;
 - platform, safe-area, reduced-motion, lifecycle, resume, restored-operation,
   normalized link, network, and back contracts;
-- provider-neutral clipboard, system-share, and safely degrading haptic contracts;
+- provider-neutral clipboard, system-share, safely degrading haptic, explicit
+  camera-permission, and item-scoped photo-picker contracts;
 - separate ordinary and secure-storage surfaces;
 - SSR-safe, standards-based web, and deterministic test adapters;
 - a reusable adapter conformance harness.
@@ -23,11 +24,17 @@ during bootstrap.
 Named imports are also the native provisioning declaration:
 
 ```ts
-import { clipboard, haptics, share } from "@absolutejs/devices";
+import { camera, clipboard, haptics, photos, share } from "@absolutejs/devices";
 
 await clipboard.writeText("Copied");
 await share.share({ text: "Hello from AbsoluteJS" });
 await haptics.impact("light");
+const permission = await camera.requestPermission();
+if (permission.state === "granted") {
+  const capture = await camera.takePhoto({ direction: "rear" });
+  image.src = capture.webPath;
+}
+const [chosen] = await photos.pick({ limit: 1 });
 ```
 
 AbsoluteJS installs and wires the matching native provider slices during mobile

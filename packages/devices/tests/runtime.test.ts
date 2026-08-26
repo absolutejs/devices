@@ -4,12 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   back,
+  camera,
   clipboard,
   haptics,
   lifecycle,
   links,
   network,
   platform,
+  photos,
   secureStorage,
   share,
   storage,
@@ -86,6 +88,22 @@ describe("@absolutejs/devices runtime", () => {
       "notification:warning",
       "selection",
     ]);
+  });
+
+  test("requires an explicit camera grant and uses the scoped photo picker", async () => {
+    const testDevice = createTestDeviceAdapter();
+    cleanup = installDeviceAdapter(testDevice.adapter);
+
+    await expect(camera.takePhoto()).rejects.toMatchObject({
+      code: "permission-required",
+    });
+    expect(testDevice.cameraPermission.requests).toBe(0);
+    expect(await camera.requestPermission()).toMatchObject({
+      state: "granted",
+    });
+    expect(testDevice.cameraPermission.requests).toBe(1);
+    expect(await camera.takePhoto()).toEqual(testDevice.pickedPhotos[0]!);
+    expect(await photos.pick({ limit: 1 })).toEqual(testDevice.pickedPhotos);
   });
 
   test("exposes resume, restored-operation, back, and external-link behavior", async () => {

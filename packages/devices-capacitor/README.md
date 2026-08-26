@@ -14,7 +14,8 @@ The release-candidate adapter covers:
 - namespaced ordinary preferences that never clear another package's keys; and
 - an Absolute-owned native credential vault backed by iOS Keychain and Android
   Keystore AES-256-GCM encryption; plus
-- opt-in Clipboard, Share, and Haptics provider slices.
+- opt-in Clipboard, Share, Haptics, Camera, and scoped photo-picker provider
+  slices.
 
 `Preferences` is never used for credentials. On a native build the adapter
 selects `AbsoluteSecureStorage` automatically when Capacitor has registered the
@@ -35,14 +36,26 @@ Optional capabilities are intentionally separate exports:
 
 ```ts
 import { createCapacitorClipboardCapability } from "@absolutejs/devices-capacitor/clipboard";
+import {
+  createCapacitorCameraCapability,
+  createCapacitorPhotosCapability,
+} from "@absolutejs/devices-capacitor/camera";
 import { createCapacitorHapticsCapability } from "@absolutejs/devices-capacitor/haptics";
 import { createCapacitorShareCapability } from "@absolutejs/devices-capacitor/share";
 ```
 
 The `absolutejs.devices` field in this package's `package.json` declares the
-factory and exact tested Capacitor dependency for each slice. The AbsoluteJS CLI
-consumes that metadata and generates these imports; users keep importing the
-provider-neutral facade only. The base entry does not import these plugins.
+factory, exact tested Capacitor dependency, and native permission purposes for
+each slice. The AbsoluteJS CLI consumes that metadata, generates imports and iOS
+usage descriptions, and leaves Android free of unnecessary camera/storage
+permissions. Users keep importing the provider-neutral facade only. The base
+entry does not import these plugins.
+
+Camera permission is never prompted implicitly: portable application code calls
+`camera.requestPermission()` from an intentional user action before
+`camera.takePhoto()`. `photos.pick()` opens the selected-item system picker and
+does not request broad photo-library access. Captures are not saved to the
+gallery and EXIF metadata is not returned by this first slice.
 
 The JavaScript contract and native sources are tested in CI; release acceptance
 still requires the real iOS/Android simulator checklist because native Keychain

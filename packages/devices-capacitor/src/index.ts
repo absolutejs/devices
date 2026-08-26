@@ -15,9 +15,11 @@ import {
   unavailableCapability,
   type DeviceAdapter,
   type DeviceClipboardCapability,
+  type DeviceCameraCapability,
   type DeviceHapticsCapability,
   type DeviceNetworkStatus,
   type DevicePlatformInfo,
+  type DevicePhotosCapability,
   type DeviceRestoredOperation,
   type DeviceSafeAreaInsets,
   type DeviceSecureStorageCapability,
@@ -27,6 +29,7 @@ import {
 import { createCapacitorSecureStorage } from "./secureStorage";
 
 export * from "./secureStorage";
+export * from "./camera";
 
 const COARSE_TABLET_MIN_WIDTH = 768;
 const DEFAULT_STORAGE_PREFIX = "absolutejs.devices.";
@@ -48,8 +51,10 @@ export type CapacitorDeviceBindings = {
 
 export type CapacitorDeviceAdapterOptions = {
   bindings?: CapacitorDeviceBindings;
+  camera?: DeviceCameraCapability;
   clipboard?: DeviceClipboardCapability;
   haptics?: DeviceHapticsCapability;
+  photos?: DevicePhotosCapability;
   secureStorage?: DeviceSecureStorageCapability;
   share?: DeviceShareCapability;
   storagePrefix?: string;
@@ -246,6 +251,7 @@ export const createCapacitorDeviceAdapter = (
     ...(options.clipboard === undefined
       ? {}
       : { clipboard: options.clipboard }),
+    ...(options.camera === undefined ? {} : { camera: options.camera }),
     ...(options.haptics === undefined ? {} : { haptics: options.haptics }),
     platform: {
       getInfo: async () => {
@@ -274,6 +280,7 @@ export const createCapacitorDeviceAdapter = (
         };
       },
     },
+    ...(options.photos === undefined ? {} : { photos: options.photos }),
     lifecycle: {
       getState: async () =>
         (

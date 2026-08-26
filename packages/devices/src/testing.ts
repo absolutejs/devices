@@ -9,6 +9,7 @@ import type {
   DeviceRestoredOperation,
   DeviceShareContent,
   DeviceShareResult,
+  DevicePhoto,
 } from "./contracts";
 import { availableCapability } from "./capabilities";
 export * from "./conformance";
@@ -21,7 +22,9 @@ export type TestDeviceController = {
   emitNetwork(status: DeviceNetworkStatus): void;
   emitRestoredOperation(operation: DeviceRestoredOperation): void;
   clipboardText: string;
+  cameraPermission: TestPermissionController;
   hapticEvents: string[];
+  pickedPhotos: DevicePhoto[];
   openedExternalUrls: string[];
   sharedContent: DeviceShareContent[];
   secureStorage: Map<string, string>;
@@ -89,6 +92,18 @@ export const createTestDeviceAdapter = (
   const openedExternalUrls: string[] = [];
   const sharedContent: DeviceShareContent[] = [];
   const hapticEvents: string[] = [];
+  const cameraPermission = createTestPermission(
+    { canRequest: true, state: "prompt" },
+    { canRequest: false, state: "granted" },
+  );
+  const pickedPhotos: DevicePhoto[] = [
+    {
+      format: "jpeg",
+      name: "test-photo.jpg",
+      sizeBytes: 4,
+      webPath: "test://photo/1",
+    },
+  ];
   let clipboardText = "";
   const adapter: DeviceAdapter = {
     runtime: "test",
@@ -100,6 +115,11 @@ export const createTestDeviceAdapter = (
           backListeners.delete(listener);
         };
       },
+    },
+    camera: {
+      capability: async () => availableCapability("emulated"),
+      ...cameraPermission.permission,
+      takePhoto: async () => pickedPhotos[0]!,
     },
     clipboard: {
       capability: async () => availableCapability("emulated"),
@@ -176,6 +196,10 @@ export const createTestDeviceAdapter = (
         };
       },
     },
+    photos: {
+      capability: async () => availableCapability("emulated"),
+      pick: async (pickOptions) => pickedPhotos.slice(0, pickOptions?.limit),
+    },
     share: {
       capability: async () => availableCapability("emulated"),
       share: async (content): Promise<DeviceShareResult> => {
@@ -210,6 +234,7 @@ export const createTestDeviceAdapter = (
 
   return {
     adapter,
+    cameraPermission,
     get clipboardText() {
       return clipboardText;
     },
@@ -234,6 +259,7 @@ export const createTestDeviceAdapter = (
     },
     hapticEvents,
     openedExternalUrls,
+    pickedPhotos,
     secureStorage: secureValues,
     sharedContent,
     storage: values,

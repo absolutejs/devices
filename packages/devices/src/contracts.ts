@@ -35,6 +35,7 @@ export type DevicePermissionCapability = {
 export type DeviceErrorCode =
   | "unsupported"
   | "unavailable"
+  | "permission-required"
   | "permission-denied"
   | "permission-blocked"
   | "cancelled"
@@ -193,6 +194,44 @@ export type DeviceHapticsCapability = {
   vibrate(durationMs?: number): Promise<void>;
 };
 
+export type DeviceCameraDirection = "front" | "rear";
+
+export type DevicePhoto = {
+  format?: string;
+  height?: number;
+  name?: string;
+  sizeBytes?: number;
+  uri?: string;
+  webPath: string;
+  width?: number;
+};
+
+export type DevicePhotoTransform = {
+  height: number;
+  quality?: number;
+  width: number;
+};
+
+export type DeviceTakePhotoOptions = {
+  direction?: DeviceCameraDirection;
+  transform?: DevicePhotoTransform;
+};
+
+export type DevicePickPhotosOptions = {
+  limit?: number;
+  transform?: DevicePhotoTransform;
+};
+
+export type DeviceCameraCapability = DevicePermissionCapability & {
+  capability(): Promise<DeviceCapabilityStatus>;
+  takePhoto(options?: DeviceTakePhotoOptions): Promise<DevicePhoto>;
+};
+
+export type DevicePhotosCapability = {
+  capability(): Promise<DeviceCapabilityStatus>;
+  pick(options?: DevicePickPhotosOptions): Promise<DevicePhoto[]>;
+};
+
 export type DeviceSecureStorageCapability = DeviceStorageCapability & {
   capability(): Promise<DeviceCapabilityStatus>;
   /** Serialize a sensitive read/network/write exchange with native workers. */
@@ -201,12 +240,14 @@ export type DeviceSecureStorageCapability = DeviceStorageCapability & {
 
 export type DeviceAdapter = {
   back?: DeviceBackCapability;
+  camera?: DeviceCameraCapability;
   clipboard?: DeviceClipboardCapability;
   haptics?: DeviceHapticsCapability;
   lifecycle: DeviceLifecycleCapability;
   links: DeviceLinksCapability;
   network: DeviceNetworkCapability;
   platform: DevicePlatformCapability;
+  photos?: DevicePhotosCapability;
   runtime: DeviceRuntime;
   secureStorage?: DeviceSecureStorageCapability;
   share?: DeviceShareCapability;
