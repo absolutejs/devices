@@ -123,6 +123,19 @@ describe("Capacitor push notifications capability", () => {
     expect(order).toEqual(["backend", "native"]);
   });
 
+  test("rolls back native registration when the backend rejects it", async () => {
+    const test = harness();
+    const push = createCapacitorPushNotificationsCapability({
+      bindings: test.bindings,
+      onRegistration: async () => {
+        throw new Error("unauthenticated");
+      },
+    });
+
+    await expect(push.enable()).rejects.toMatchObject({ code: "failed" });
+    expect(test.unregister).toHaveBeenCalledTimes(1);
+  });
+
   test("fails closed when the optional plugin is absent", async () => {
     const push = createCapacitorPushNotificationsCapability({
       bindings: {

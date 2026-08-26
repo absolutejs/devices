@@ -16,7 +16,7 @@
     },
     "packages/devices-capacitor": {
       "name": "@absolutejs/devices-capacitor",
-      "version": "0.7.0",
+      "version": "0.7.1",
       "dependencies": {
         "@capacitor/app": "^8.0.0",
         "@capacitor/browser": "^8.0.0",

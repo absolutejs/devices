@@ -179,80 +179,93 @@ export const createCapacitorPushNotificationsCapability = (
     },
     enable: async () => {
       requireInstalled(bindings);
-      await new Promise<void>(async (resolve, reject) => {
-        let settled = false;
-        let registrationHandle:
-          | Awaited<ReturnType<PushNotificationsPlugin["addListener"]>>
-          | undefined;
-        let errorHandle:
-          | Awaited<ReturnType<PushNotificationsPlugin["addListener"]>>
-          | undefined;
-        const finish = async (error?: unknown) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          await Promise.allSettled([
-            registrationHandle?.remove(),
-            errorHandle?.remove(),
-          ]);
-          if (error === undefined) resolve();
-          else reject(error);
-        };
-        const timer = setTimeout(
-          () =>
-            void finish(
-              new DeviceError(
-                "temporarily-unavailable",
-                "Native push registration timed out.",
-              ),
-            ),
-          timeoutMs,
-        );
-        try {
-          registrationHandle = await bindings.pushNotifications.addListener(
-            "registration",
-            ({ value }) => {
-              const token = value.trim();
-              if (!token) {
-                void finish(
-                  new DeviceError(
-                    "failed",
-                    "Native push registration returned an empty token.",
-                  ),
-                );
-                return;
-              }
-              const platform =
-                bindings.capacitor.getPlatform() === "ios" ? "apns" : "fcm";
-              Promise.resolve(options.onRegistration?.({ platform, token }))
-                .then(() => finish())
-                .catch((error) =>
-                  finish(
-                    nativeFailure(
-                      error,
-                      "The backend rejected native push registration.",
-                    ),
-                  ),
-                );
-            },
-          );
-          errorHandle = await bindings.pushNotifications.addListener(
-            "registrationError",
-            ({ error }) =>
+      try {
+        await new Promise<void>(async (resolve, reject) => {
+          let settled = false;
+          let registrationHandle:
+            | Awaited<ReturnType<PushNotificationsPlugin["addListener"]>>
+            | undefined;
+          let errorHandle:
+            | Awaited<ReturnType<PushNotificationsPlugin["addListener"]>>
+            | undefined;
+          const finish = async (error?: unknown) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            await Promise.allSettled([
+              registrationHandle?.remove(),
+              errorHandle?.remove(),
+            ]);
+            if (error === undefined) resolve();
+            else reject(error);
+          };
+          const timer = setTimeout(
+            () =>
               void finish(
                 new DeviceError(
                   "temporarily-unavailable",
-                  `Native push registration failed: ${error}`,
+                  "Native push registration timed out.",
                 ),
               ),
+            timeoutMs,
           );
-          await bindings.pushNotifications.register();
-        } catch (error) {
-          await finish(
-            nativeFailure(error, "Failed to register for native push."),
+          try {
+            registrationHandle = await bindings.pushNotifications.addListener(
+              "registration",
+              ({ value }) => {
+                const token = value.trim();
+                if (!token) {
+                  void finish(
+                    new DeviceError(
+                      "failed",
+                      "Native push registration returned an empty token.",
+                    ),
+                  );
+                  return;
+                }
+                const platform =
+                  bindings.capacitor.getPlatform() === "ios" ? "apns" : "fcm";
+                Promise.resolve(options.onRegistration?.({ platform, token }))
+                  .then(() => finish())
+                  .catch((error) =>
+                    finish(
+                      nativeFailure(
+                        error,
+                        "The backend rejected native push registration.",
+                      ),
+                    ),
+                  );
+              },
+            );
+            errorHandle = await bindings.pushNotifications.addListener(
+              "registrationError",
+              ({ error }) =>
+                void finish(
+                  new DeviceError(
+                    "temporarily-unavailable",
+                    `Native push registration failed: ${error}`,
+                  ),
+                ),
+            );
+            await bindings.pushNotifications.register();
+          } catch (error) {
+            await finish(
+              nativeFailure(error, "Failed to register for native push."),
+            );
+          }
+        });
+      } catch (registrationError) {
+        try {
+          await bindings.pushNotifications.unregister();
+        } catch (rollbackError) {
+          throw new DeviceError(
+            "failed",
+            "Native push registration failed and could not be rolled back.",
+            { cause: new AggregateError([registrationError, rollbackError]) },
           );
         }
-      });
+        throw registrationError;
+      }
     },
     onAction: async (listener) => {
       requireInstalled(bindings);
