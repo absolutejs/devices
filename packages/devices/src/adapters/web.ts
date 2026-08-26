@@ -6,11 +6,15 @@ import {
   type DeviceSafeAreaInsets,
   type DeviceShareContent,
   type DevicePhoto,
+  type DeviceLocationPermissionStatus,
+  type DeviceLocationPosition,
+  type DeviceLocationWatchOptions,
 } from "../contracts";
 import {
   availableCapability,
   normalizeDeviceShareContent,
   unavailableCapability,
+  validateDeviceLocationOptions,
 } from "../capabilities";
 
 const COARSE_TABLET_MIN_WIDTH = 768;
@@ -101,6 +105,73 @@ const webOperation = async <T>(
     throw webFailure(error, message);
   }
 };
+
+const locationFailure = (error: unknown) => {
+  const code =
+    typeof error === "object" && error !== null
+      ? Reflect.get(error, "code")
+      : undefined;
+  if (code === 1)
+    return new DeviceError(
+      "permission-denied",
+      "Browser location permission was denied.",
+      { cause: error },
+    );
+  if (code === 2)
+    return new DeviceError(
+      "temporarily-unavailable",
+      "The browser could not determine the current location.",
+      { cause: error },
+    );
+  if (code === 3)
+    return new DeviceError(
+      "temporarily-unavailable",
+      "The browser location request timed out.",
+      { cause: error },
+    );
+
+  return webFailure(error, "Browser location failed.");
+};
+
+const locationPosition = (
+  value: GeolocationPosition,
+): DeviceLocationPosition => {
+  const { coords } = value;
+  if (
+    !Number.isFinite(coords.latitude) ||
+    !Number.isFinite(coords.longitude) ||
+    !Number.isFinite(coords.accuracy) ||
+    !Number.isFinite(value.timestamp)
+  )
+    throw new DeviceError(
+      "failed",
+      "The browser returned an invalid location position.",
+    );
+
+  return {
+    accuracyMeters: coords.accuracy,
+    ...(coords.altitudeAccuracy === null
+      ? {}
+      : { altitudeAccuracyMeters: coords.altitudeAccuracy }),
+    ...(coords.altitude === null ? {} : { altitudeMeters: coords.altitude }),
+    ...(coords.heading === null ? {} : { headingDegrees: coords.heading }),
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+    native: value,
+    ...(coords.speed === null ? {} : { speedMetersPerSecond: coords.speed }),
+    timestampMs: value.timestamp,
+  };
+};
+
+const webLocationOptions = (
+  options?: DeviceLocationWatchOptions,
+): PositionOptions => ({
+  enableHighAccuracy: options?.accuracy === "high",
+  ...(options?.maximumAgeMs === undefined
+    ? {}
+    : { maximumAge: options.maximumAgeMs }),
+  ...(options?.timeoutMs === undefined ? {} : { timeout: options.timeoutMs }),
+});
 
 const clipboardStatus = (operation: "read" | "write") => {
   const method = operation === "read" ? "readText" : "writeText";
@@ -212,6 +283,55 @@ const pickImages = async (options: {
 
 export const createWebDeviceAdapter = (): DeviceAdapter => {
   let cameraAuthorized = false;
+  let locationAuthorized = false;
+
+  const queryLocationPermission =
+    async (): Promise<DeviceLocationPermissionStatus> => {
+      if (typeof navigator.geolocation === "undefined")
+        return {
+          canRequest: false,
+          precision: "unknown",
+          state: "unavailable",
+        };
+      if (locationAuthorized)
+        return { canRequest: false, precision: "unknown", state: "granted" };
+      if (typeof navigator.permissions?.query !== "function")
+        return { canRequest: true, precision: "unknown", state: "prompt" };
+      try {
+        const status = await navigator.permissions.query({
+          name: "geolocation",
+        });
+        return {
+          canRequest: status.state === "prompt",
+          precision: "unknown",
+          state: status.state,
+        };
+      } catch {
+        return { canRequest: true, precision: "unknown", state: "prompt" };
+      }
+    };
+
+  const currentLocation = async (options?: DeviceLocationWatchOptions) => {
+    validateDeviceLocationOptions(options);
+    if (typeof navigator.geolocation === "undefined")
+      throw new DeviceError(
+        "unsupported",
+        "Browser geolocation is unavailable.",
+      );
+    return new Promise<DeviceLocationPosition>((resolve, reject) =>
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          try {
+            resolve(locationPosition(position));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        (error) => reject(locationFailure(error)),
+        webLocationOptions(options),
+      ),
+    );
+  };
 
   return {
     runtime: "web",
@@ -341,6 +461,55 @@ export const createWebDeviceAdapter = (): DeviceAdapter => {
           );
         }
         window.open(parsed.href, "_blank", "noopener,noreferrer");
+      },
+    },
+    location: {
+      capability: async () =>
+        typeof navigator.geolocation === "undefined"
+          ? unavailableCapability(
+              "unsupported",
+              "Browser geolocation is unavailable.",
+            )
+          : availableCapability("web"),
+      current: currentLocation,
+      queryPermission: queryLocationPermission,
+      requestPermission: async () => {
+        await currentLocation();
+        locationAuthorized = true;
+        const status = await queryLocationPermission();
+        return { ...status, state: "granted" };
+      },
+      watch: async (listener, options) => {
+        validateDeviceLocationOptions(options);
+        if (typeof navigator.geolocation === "undefined")
+          throw new DeviceError(
+            "unsupported",
+            "Browser geolocation is unavailable.",
+          );
+        let active = true;
+        const id = navigator.geolocation.watchPosition(
+          (position) => {
+            if (!active) return;
+            try {
+              listener({
+                position: locationPosition(position),
+                type: "position",
+              });
+            } catch (error) {
+              listener({ error: locationFailure(error), type: "error" });
+            }
+          },
+          (error) => {
+            if (active)
+              listener({ error: locationFailure(error), type: "error" });
+          },
+          webLocationOptions(options),
+        );
+        return () => {
+          if (!active) return;
+          active = false;
+          navigator.geolocation.clearWatch(id);
+        };
       },
     },
     network: {

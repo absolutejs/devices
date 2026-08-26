@@ -15,7 +15,9 @@ The release-candidate adapter covers:
 - an Absolute-owned native credential vault backed by iOS Keychain and Android
   Keystore AES-256-GCM encryption; plus
 - opt-in Clipboard, Share, Haptics, Camera, and scoped photo-picker provider
-  slices.
+  slices; and
+- opt-in foreground Geolocation with approximate/precise permission reporting,
+  one-shot reads, watched updates, and deterministic cleanup.
 
 `Preferences` is never used for credentials. On a native build the adapter
 selects `AbsoluteSecureStorage` automatically when Capacitor has registered the
@@ -41,6 +43,7 @@ import {
   createCapacitorPhotosCapability,
 } from "@absolutejs/devices-capacitor/camera";
 import { createCapacitorHapticsCapability } from "@absolutejs/devices-capacitor/haptics";
+import { createCapacitorLocationCapability } from "@absolutejs/devices-capacitor/location";
 import { createCapacitorShareCapability } from "@absolutejs/devices-capacitor/share";
 ```
 
@@ -48,7 +51,9 @@ The `absolutejs.devices` field in this package's `package.json` declares the
 factory, exact tested Capacitor dependency, and native permission purposes for
 each slice. The AbsoluteJS CLI consumes that metadata, generates imports and iOS
 usage descriptions, and leaves Android free of unnecessary camera/storage
-permissions. Users keep importing the provider-neutral facade only. The base
+permissions. Foreground location adds only coarse/fine Android permissions and
+the provider-required iOS usage strings. Users keep importing the
+provider-neutral facade only. The base
 entry does not import these plugins.
 
 Camera permission is never prompted implicitly: portable application code calls
@@ -56,6 +61,12 @@ Camera permission is never prompted implicitly: portable application code calls
 `camera.takePhoto()`. `photos.pick()` opens the selected-item system picker and
 does not request broad photo-library access. Captures are not saved to the
 gallery and EXIF metadata is not returned by this first slice.
+
+Location permission is also explicit. The adapter does not start a watch during
+bootstrap, never claims background delivery, preserves approximate versus precise
+access, and maps disabled services, policy restriction, timeout, and provider
+failures into the shared device error vocabulary. Every successful watch returns
+an idempotent cleanup function that clears the native provider watch.
 
 The JavaScript contract and native sources are tested in CI; release acceptance
 still requires the real iOS/Android simulator checklist because native Keychain

@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/devices-capacitor",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Capacitor runtime adapter for @absolutejs/devices",
   "type": "module",
   "license": "BSL-1.1",
@@ -52,6 +52,10 @@
       "types": "./dist/haptics.d.ts",
       "import": "./dist/haptics.js"
     },
+    "./location": {
+      "types": "./dist/location.d.ts",
+      "import": "./dist/location.js"
+    },
     "./share": {
       "types": "./dist/share.d.ts",
       "import": "./dist/share.js"
@@ -61,7 +65,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "bun build src/index.ts src/camera.ts src/clipboard.ts src/haptics.ts src/share.ts --outdir dist --target=browser --external @absolutejs/devices --external @capacitor/core --external @capacitor/app --external @capacitor/browser --external @capacitor/camera --external @capacitor/clipboard --external @capacitor/haptics --external @capacitor/network --external @capacitor/preferences --external @capacitor/share && tsc --emitDeclarationOnly -p tsconfig.build.json",
+    "build": "bun build src/index.ts src/camera.ts src/clipboard.ts src/haptics.ts src/location.ts src/share.ts --outdir dist --target=browser --external @absolutejs/devices --external @capacitor/core --external @capacitor/app --external @capacitor/browser --external @capacitor/camera --external @capacitor/clipboard --external @capacitor/geolocation --external @capacitor/haptics --external @capacitor/network --external @capacitor/preferences --external @capacitor/share && tsc --emitDeclarationOnly -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -71,10 +75,11 @@
     "@capacitor/preferences": "^8.0.0"
   },
   "peerDependencies": {
-    "@absolutejs/devices": "^0.2.0",
+    "@absolutejs/devices": "^0.3.0",
     "@capacitor/camera": ">=8.1 <9",
     "@capacitor/clipboard": ">=8 <9",
     "@capacitor/core": ">=8 <9",
+    "@capacitor/geolocation": ">=8.2 <9",
     "@capacitor/haptics": ">=8 <9",
     "@capacitor/share": ">=8 <9"
   },
@@ -83,6 +88,9 @@
       "optional": true
     },
     "@capacitor/clipboard": {
+      "optional": true
+    },
+    "@capacitor/geolocation": {
       "optional": true
     },
     "@capacitor/haptics": {
@@ -96,6 +104,7 @@
     "@absolutejs/devices": "workspace:*",
     "@capacitor/camera": "8.2.3",
     "@capacitor/clipboard": "8.0.1",
+    "@capacitor/geolocation": "8.2.2",
     "@capacitor/haptics": "8.0.2",
     "@capacitor/share": "8.0.1"
   },
@@ -131,6 +140,27 @@
           "packages": [
             "@capacitor/haptics@8.0.2"
           ]
+        },
+        "location": {
+          "factory": "createCapacitorLocationCapability",
+          "module": "@absolutejs/devices-capacitor/location",
+          "packages": [
+            "@capacitor/geolocation@8.2.2"
+          ],
+          "native": {
+            "android": {
+              "permissions": [
+                "android.permission.ACCESS_COARSE_LOCATION",
+                "android.permission.ACCESS_FINE_LOCATION"
+              ]
+            },
+            "ios": {
+              "usageDescriptions": [
+                "location-always",
+                "location-when-in-use"
+              ]
+            }
+          }
         },
         "photos": {
           "factory": "createCapacitorPhotosCapability",

@@ -9,6 +9,7 @@ import {
   haptics,
   lifecycle,
   links,
+  location,
   network,
   platform,
   photos,
@@ -104,6 +105,36 @@ describe("@absolutejs/devices runtime", () => {
     expect(testDevice.cameraPermission.requests).toBe(1);
     expect(await camera.takePhoto()).toEqual(testDevice.pickedPhotos[0]!);
     expect(await photos.pick({ limit: 1 })).toEqual(testDevice.pickedPhotos);
+  });
+
+  test("requires explicit location permission and cleans up watches", async () => {
+    const testDevice = createTestDeviceAdapter();
+    cleanup = installDeviceAdapter(testDevice.adapter);
+
+    await expect(location.current()).rejects.toMatchObject({
+      code: "permission-required",
+    });
+    expect(testDevice.locationPermission.requests).toBe(0);
+    expect(
+      await location.requestPermission({ precision: "precise" }),
+    ).toMatchObject({ precision: "precise", state: "granted" });
+    expect(testDevice.locationPermission.requests).toBe(1);
+    expect(await location.current()).toEqual(testDevice.locations.at(-1)!);
+
+    const events: number[] = [];
+    const remove = await location.watch((event) => {
+      if (event.type === "position") events.push(event.position.latitude);
+    });
+    testDevice.emitLocation({
+      accuracyMeters: 3,
+      latitude: 51.5072,
+      longitude: -0.1276,
+      timestampMs: 1_777_000_000_001,
+    });
+    expect(events).toEqual([51.5072]);
+    await remove();
+    testDevice.emitLocation();
+    expect(events).toEqual([51.5072]);
   });
 
   test("exposes resume, restored-operation, back, and external-link behavior", async () => {

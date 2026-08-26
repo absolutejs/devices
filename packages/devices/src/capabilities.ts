@@ -4,6 +4,8 @@ import {
   type DeviceCapabilityStatus,
   type DeviceCapabilityUnavailableReason,
   type DeviceErrorCode,
+  type DeviceLocationOptions,
+  type DeviceLocationWatchOptions,
   type DeviceRuntime,
   type DeviceShareContent,
 } from "./contracts";
@@ -45,6 +47,35 @@ export const normalizeDeviceError = (
     : new DeviceError(options.code ?? "failed", options.message, {
         cause: error,
       });
+
+const requireFiniteNonNegative = (value: number, field: string) => {
+  if (!Number.isFinite(value) || value < 0)
+    throw new TypeError(`${field} must be a finite non-negative number.`);
+};
+
+const requireFinitePositive = (value: number, field: string) => {
+  if (!Number.isFinite(value) || value <= 0)
+    throw new TypeError(`${field} must be a finite positive number.`);
+};
+
+export const validateDeviceLocationOptions = (
+  options?: DeviceLocationOptions | DeviceLocationWatchOptions,
+) => {
+  const watchOptions = options as DeviceLocationWatchOptions | undefined;
+  if (options?.maximumAgeMs !== undefined)
+    requireFiniteNonNegative(options.maximumAgeMs, "Location maximumAgeMs");
+  if (options?.timeoutMs !== undefined)
+    requireFinitePositive(options.timeoutMs, "Location timeoutMs");
+  if (watchOptions?.intervalMs !== undefined)
+    requireFinitePositive(watchOptions.intervalMs, "Location intervalMs");
+  if (watchOptions?.minimumUpdateIntervalMs !== undefined)
+    requireFinitePositive(
+      watchOptions.minimumUpdateIntervalMs,
+      "Location minimumUpdateIntervalMs",
+    );
+
+  return options;
+};
 
 export const runtimeCapability = (
   runtime: DeviceRuntime,

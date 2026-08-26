@@ -12,6 +12,10 @@ import {
   type DeviceClipboardOperation,
   type DeviceHapticImpactStyle,
   type DeviceHapticNotificationType,
+  type DeviceLocationEvent,
+  type DeviceLocationOptions,
+  type DeviceLocationPermissionOptions,
+  type DeviceLocationWatchOptions,
   type DeviceShareContent,
   type DeviceSubscription,
 } from "./contracts";
@@ -40,6 +44,24 @@ const requireOptional = <T>(value: T | undefined, capability: string): T => {
     "unsupported",
     `${capability} is not installed for this runtime.`,
   );
+};
+
+const requireGrantedLocation = async () => {
+  const capability = requireOptional(getDeviceAdapter().location, "Location");
+  const permission = await capability.queryPermission();
+  if (permission.state !== "granted")
+    throw new DeviceError(
+      permission.state === "unavailable"
+        ? "unavailable"
+        : permission.state === "blocked"
+          ? "permission-blocked"
+          : permission.state === "denied"
+            ? "permission-denied"
+            : "permission-required",
+      "Location permission must be granted with location.requestPermission() before reading a position.",
+    );
+
+  return capability;
 };
 
 export const camera = {
@@ -201,6 +223,24 @@ export const links = {
   onOpenLink: (listener: (link: ReturnType<typeof parseDeviceLink>) => void) =>
     getDeviceAdapter().links.onOpen((url) => listener(parseDeviceLink(url))),
   openExternal: (url: string) => getDeviceAdapter().links.openExternal(url),
+};
+
+export const location = {
+  capability: () =>
+    getDeviceAdapter().location?.capability() ??
+    Promise.resolve(unavailableOptional("Location")),
+  current: async (options?: DeviceLocationOptions) =>
+    (await requireGrantedLocation()).current(options),
+  permission: () =>
+    requireOptional(getDeviceAdapter().location, "Location").queryPermission(),
+  requestPermission: (options?: DeviceLocationPermissionOptions) =>
+    requireOptional(getDeviceAdapter().location, "Location").requestPermission(
+      options,
+    ),
+  watch: async (
+    listener: (event: DeviceLocationEvent) => void,
+    options?: DeviceLocationWatchOptions,
+  ) => (await requireGrantedLocation()).watch(listener, options),
 };
 
 export const secureStorage = {

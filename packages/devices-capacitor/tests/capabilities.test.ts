@@ -7,6 +7,12 @@ import {
   createCapacitorPhotosCapability,
 } from "../src/camera";
 import type { CameraPlugin } from "@capacitor/camera";
+import type {
+  GeolocationPlugin,
+  Position,
+  WatchPositionCallback,
+} from "@capacitor/geolocation";
+import { createCapacitorLocationCapability } from "../src/location";
 
 const runtime = (plugins: string[]) => ({
   getPlatform: () => "ios",
@@ -166,5 +172,80 @@ describe("optional Capacitor capabilities", () => {
     });
     await unavailable.impact();
     expect(await unavailable.capability()).toMatchObject({ available: false });
+  });
+
+  test("normalizes precise location permission, positions, errors, and cleanup", async () => {
+    let callback: WatchPositionCallback | undefined;
+    let permission = {
+      coarseLocation: "prompt" as const | "granted",
+      location: "prompt" as const | "granted",
+    };
+    const providerPosition = {
+      coords: {
+        accuracy: 3,
+        altitude: 12,
+        altitudeAccuracy: 2,
+        course: null,
+        heading: 180,
+        headingAccuracy: null,
+        latitude: 37.7749,
+        longitude: -122.4194,
+        magneticHeading: null,
+        speed: 1.25,
+        trueHeading: null,
+      },
+      timestamp: 1_777_000_000_000,
+    } satisfies Position;
+    const clearWatch = mock(async () => undefined);
+    const requestPermissions = mock(async () => {
+      permission = { coarseLocation: "granted", location: "granted" };
+      return permission;
+    });
+    const geolocation = {
+      checkPermissions: async () => permission,
+      clearWatch,
+      getCurrentPosition: async () => providerPosition,
+      requestPermissions,
+      watchPosition: async (_options, listener) => {
+        callback = listener;
+        return "location-watch-1";
+      },
+    } as GeolocationPlugin;
+    const location = createCapacitorLocationCapability({
+      capacitor: runtime(["Geolocation"]),
+      geolocation,
+    });
+
+    expect(await location.queryPermission()).toMatchObject({
+      canRequest: true,
+      precision: "unknown",
+      state: "prompt",
+    });
+    expect(
+      await location.requestPermission({ precision: "precise" }),
+    ).toMatchObject({ precision: "precise", state: "granted" });
+    expect(requestPermissions).toHaveBeenCalledWith({
+      permissions: ["location"],
+    });
+    expect(await location.current({ accuracy: "high" })).toMatchObject({
+      accuracyMeters: 3,
+      headingDegrees: 180,
+      latitude: 37.7749,
+      longitude: -122.4194,
+      speedMetersPerSecond: 1.25,
+    });
+
+    const events: string[] = [];
+    const remove = await location.watch((event) => events.push(event.type), {
+      intervalMs: 2_000,
+      minimumUpdateIntervalMs: 1_000,
+    });
+    callback?.(providerPosition);
+    callback?.(null, { code: "OS-PLUG-GLOC-0010" });
+    expect(events).toEqual(["position", "error"]);
+    await remove();
+    await remove();
+    expect(clearWatch).toHaveBeenCalledTimes(1);
+    expect(clearWatch).toHaveBeenCalledWith({ id: "location-watch-1" });
   });
 });

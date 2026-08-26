@@ -40,7 +40,8 @@ is visible through the other.
 The root facade remains import-only for applications and delegates to one installed
 adapter. `platform.info()`, `network.status()`, normalized launch/inbound links,
 lifecycle/resume/restored-operation listeners, and ordinary storage work without
-provider branches. Back interception, clipboard, sharing, haptics, and secure
+provider branches. Back interception, clipboard, sharing, haptics, foreground
+location, and secure
 storage are optional adapter features. Their capability queries return a
 discriminated unavailable result. Clipboard and sharing fail with a typed error
 when unavailable; haptic effects safely degrade to a no-op so tactile feedback
@@ -88,6 +89,12 @@ versioned `absolutejs.devices` manifest that maps each capability to its factory
 subpath, and exact tested native package version. AbsoluteJS owns source discovery,
 dependency installation, and generated bootstrap wiring. This keeps the manifest
 declarative and prevents a dependency package from executing installation code.
+
+Camera/photos and foreground location follow the same isolated-provider model.
+Location exposes explicit approximate/precise permission, one-shot reads, and
+watched position/error events with mandatory cleanup. It does not imply
+background tracking: that would require a separate capability, native provider,
+permission set, persistence policy, and store-review posture.
 
 Automatic bootstrap installs the adapter only when Capacitor reports a native
 platform. Browser previews retain the web adapter. Secure storage remains absent

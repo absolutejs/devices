@@ -35,8 +35,24 @@ const installWebEnvironment = () => {
   let clipboardText = "";
   let href = "https://app.example.test/start?source=launch#top";
   let online = true;
+  let locationPermission: PermissionState = "prompt";
   let visibilityState: DocumentVisibilityState = "visible";
   const captures: string[] = [];
+  const locationOptions: PositionOptions[] = [];
+  const locationWatchers = new Map<number, PositionCallback>();
+  let nextLocationWatch = 1;
+  const currentPosition = {
+    coords: {
+      accuracy: 4,
+      altitude: 8,
+      altitudeAccuracy: 2,
+      heading: 90,
+      latitude: 40.7128,
+      longitude: -74.006,
+      speed: 1.5,
+    },
+    timestamp: 1_777_000_000_000,
+  } as GeolocationPosition;
   const NativeUrl = URL;
   const localStorage = {
     clear: () => values.clear(),
@@ -90,7 +106,34 @@ const installWebEnvironment = () => {
       },
     },
     connection: { type: "wifi" },
+    geolocation: {
+      clearWatch: (id: number) => {
+        locationWatchers.delete(id);
+      },
+      getCurrentPosition: (
+        success: PositionCallback,
+        _error?: PositionErrorCallback | null,
+        options?: PositionOptions,
+      ) => {
+        locationPermission = "granted";
+        if (options) locationOptions.push(options);
+        success(currentPosition);
+      },
+      watchPosition: (
+        success: PositionCallback,
+        _error?: PositionErrorCallback | null,
+        options?: PositionOptions,
+      ) => {
+        const id = nextLocationWatch++;
+        if (options) locationOptions.push(options);
+        locationWatchers.set(id, success);
+        return id;
+      },
+    },
     language: "en-US",
+    permissions: {
+      query: async () => ({ state: locationPermission }),
+    },
     get onLine() {
       return online;
     },
@@ -151,6 +194,9 @@ const installWebEnvironment = () => {
       href = url;
       globalEvents.dispatchEvent(new Event("popstate"));
     },
+    emitLocation: (position: GeolocationPosition = currentPosition) => {
+      for (const listener of locationWatchers.values()) listener(position);
+    },
     emitNetwork: (status: { connected: boolean }) => {
       online = status.connected;
       globalEvents.dispatchEvent(
@@ -159,6 +205,7 @@ const installWebEnvironment = () => {
     },
     opened,
     captures,
+    locationOptions,
     shared,
     vibrations,
   };
@@ -237,5 +284,46 @@ describe("web device adapter", () => {
     });
     expect(environment.captures).toEqual(["user"]);
     expect(await adapter.photos?.pick({ limit: 1 })).toHaveLength(1);
+  });
+
+  test("requests browser location explicitly and disposes watches", async () => {
+    const environment = installWebEnvironment();
+    const adapter = createWebDeviceAdapter();
+
+    expect(await adapter.location?.queryPermission()).toMatchObject({
+      canRequest: true,
+      precision: "unknown",
+      state: "prompt",
+    });
+    expect(await adapter.location?.requestPermission()).toMatchObject({
+      state: "granted",
+    });
+    expect(
+      await adapter.location?.current({
+        accuracy: "high",
+        maximumAgeMs: 1_000,
+        timeoutMs: 5_000,
+      }),
+    ).toMatchObject({
+      accuracyMeters: 4,
+      latitude: 40.7128,
+      longitude: -74.006,
+      timestampMs: 1_777_000_000_000,
+    });
+
+    const updates: number[] = [];
+    const remove = await adapter.location?.watch((event) => {
+      if (event.type === "position") updates.push(event.position.longitude);
+    });
+    environment.emitLocation();
+    expect(updates).toEqual([-74.006]);
+    await remove?.();
+    environment.emitLocation();
+    expect(updates).toEqual([-74.006]);
+    expect(environment.locationOptions).toContainEqual({
+      enableHighAccuracy: true,
+      maximumAge: 1_000,
+      timeout: 5_000,
+    });
   });
 });

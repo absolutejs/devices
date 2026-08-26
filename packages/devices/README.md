@@ -11,7 +11,8 @@ The pre-1.0 core includes:
 - platform, safe-area, reduced-motion, lifecycle, resume, restored-operation,
   normalized link, network, and back contracts;
 - provider-neutral clipboard, system-share, safely degrading haptic, explicit
-  camera-permission, and item-scoped photo-picker contracts;
+  camera-permission, item-scoped photo-picker, and foreground location
+  contracts;
 - separate ordinary and secure-storage surfaces;
 - SSR-safe, standards-based web, and deterministic test adapters;
 - a reusable adapter conformance harness.
@@ -24,7 +25,14 @@ during bootstrap.
 Named imports are also the native provisioning declaration:
 
 ```ts
-import { camera, clipboard, haptics, photos, share } from "@absolutejs/devices";
+import {
+  camera,
+  clipboard,
+  haptics,
+  location,
+  photos,
+  share,
+} from "@absolutejs/devices";
 
 await clipboard.writeText("Copied");
 await share.share({ text: "Hello from AbsoluteJS" });
@@ -35,11 +43,30 @@ if (permission.state === "granted") {
   image.src = capture.webPath;
 }
 const [chosen] = await photos.pick({ limit: 1 });
+
+const locationPermission = await location.requestPermission({
+  precision: "coarse",
+});
+if (locationPermission.state === "granted") {
+  const current = await location.current();
+  const stop = await location.watch((event) => {
+    if (event.type === "position") console.log(event.position);
+  });
+  // Stop promptly when the owning view no longer needs location updates.
+  await stop();
+}
 ```
 
 AbsoluteJS installs and wires the matching native provider slices during mobile
 initialization. Browser and SSR behavior remains standards-based and safe without
 application-side runtime branches.
+
+Location is foreground-only. Capability and permission queries never prompt;
+`requestPermission()` must run from an intentional user action. The normalized
+status reports `coarse`, `precise`, or `unknown` precision, and watch callbacks
+deliver typed position/error events. Background tracking is deliberately not
+included because it requires a separate privacy, battery, store-review, and
+native-lifecycle contract.
 
 The installation registry is shared through the JavaScript realm, so
 independently built shell and page bundles still observe the same selected

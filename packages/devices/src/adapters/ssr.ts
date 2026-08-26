@@ -75,6 +75,29 @@ export const createSsrDeviceAdapter = (): DeviceAdapter => ({
       throw unavailable("External links");
     },
   },
+  location: {
+    capability: async () => ({
+      available: false,
+      reason: "unavailable",
+      message: "Location is unavailable during server rendering.",
+    }),
+    current: async () => {
+      throw unavailable("Location");
+    },
+    queryPermission: async () => ({
+      canRequest: false,
+      precision: "unknown",
+      state: "unavailable",
+    }),
+    requestPermission: async () => ({
+      canRequest: false,
+      precision: "unknown",
+      state: "unavailable",
+    }),
+    watch: async () => {
+      throw unavailable("Location");
+    },
+  },
   network: {
     getStatus: async () => ({ connected: false, connectionType: "unknown" }),
     onChange: async () => noopSubscription(),

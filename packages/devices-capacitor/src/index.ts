@@ -17,6 +17,7 @@ import {
   type DeviceClipboardCapability,
   type DeviceCameraCapability,
   type DeviceHapticsCapability,
+  type DeviceLocationCapability,
   type DeviceNetworkStatus,
   type DevicePlatformInfo,
   type DevicePhotosCapability,
@@ -53,6 +54,7 @@ export type CapacitorDeviceAdapterOptions = {
   camera?: DeviceCameraCapability;
   clipboard?: DeviceClipboardCapability;
   haptics?: DeviceHapticsCapability;
+  location?: DeviceLocationCapability;
   photos?: DevicePhotosCapability;
   secureStorage?: DeviceSecureStorageCapability;
   share?: DeviceShareCapability;
@@ -349,6 +351,7 @@ export const createCapacitorDeviceAdapter = (
           bindings.browser.open({ url: externalUrl(url) }),
         ),
     },
+    ...(options.location === undefined ? {} : { location: options.location }),
     network: {
       getStatus: async () =>
         connectionStatus(

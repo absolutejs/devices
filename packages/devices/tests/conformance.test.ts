@@ -13,6 +13,7 @@ describe("device adapter conformance", () => {
       emitBack: device.emitBack,
       emitLifecycle: device.emitLifecycle,
       emitLink: device.emitLink,
+      emitLocation: device.emitLocation,
       emitNetwork: device.emitNetwork,
       emitRestoredOperation: device.emitRestoredOperation,
       storage: true,

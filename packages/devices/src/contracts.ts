@@ -194,6 +194,56 @@ export type DeviceHapticsCapability = {
   vibrate(durationMs?: number): Promise<void>;
 };
 
+export type DeviceLocationPrecision = "coarse" | "precise";
+
+export type DeviceLocationPermissionStatus = DevicePermissionStatus & {
+  precision: DeviceLocationPrecision | "unknown";
+};
+
+export type DeviceLocationPermissionOptions = {
+  precision?: DeviceLocationPrecision;
+};
+
+export type DeviceLocationOptions = {
+  accuracy?: "balanced" | "high";
+  maximumAgeMs?: number;
+  timeoutMs?: number;
+};
+
+export type DeviceLocationWatchOptions = DeviceLocationOptions & {
+  intervalMs?: number;
+  minimumUpdateIntervalMs?: number;
+};
+
+export type DeviceLocationPosition = {
+  accuracyMeters: number;
+  altitudeAccuracyMeters?: number;
+  altitudeMeters?: number;
+  headingDegrees?: number;
+  latitude: number;
+  longitude: number;
+  native?: unknown;
+  speedMetersPerSecond?: number;
+  timestampMs: number;
+};
+
+export type DeviceLocationEvent =
+  | { position: DeviceLocationPosition; type: "position" }
+  | { error: DeviceError; type: "error" };
+
+export type DeviceLocationCapability = {
+  capability(): Promise<DeviceCapabilityStatus>;
+  current(options?: DeviceLocationOptions): Promise<DeviceLocationPosition>;
+  queryPermission(): Promise<DeviceLocationPermissionStatus>;
+  requestPermission(
+    options?: DeviceLocationPermissionOptions,
+  ): Promise<DeviceLocationPermissionStatus>;
+  watch(
+    listener: (event: DeviceLocationEvent) => void,
+    options?: DeviceLocationWatchOptions,
+  ): Promise<DeviceSubscription>;
+};
+
 export type DeviceCameraDirection = "front" | "rear";
 
 export type DevicePhoto = {
@@ -245,6 +295,7 @@ export type DeviceAdapter = {
   haptics?: DeviceHapticsCapability;
   lifecycle: DeviceLifecycleCapability;
   links: DeviceLinksCapability;
+  location?: DeviceLocationCapability;
   network: DeviceNetworkCapability;
   platform: DevicePlatformCapability;
   photos?: DevicePhotosCapability;

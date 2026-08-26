@@ -2,6 +2,8 @@ import type {
   DeviceAdapter,
   DeviceBackEvent,
   DeviceLifecycleState,
+  DeviceLocationEvent,
+  DeviceLocationPosition,
   DeviceNetworkStatus,
   DevicePermissionCapability,
   DevicePermissionStatus,
@@ -11,6 +13,7 @@ import type {
   DeviceShareResult,
   DevicePhoto,
 } from "./contracts";
+import { DeviceError } from "./contracts";
 import { availableCapability } from "./capabilities";
 export * from "./conformance";
 
@@ -19,11 +22,15 @@ export type TestDeviceController = {
   emitBack(event?: DeviceBackEvent): void;
   emitLifecycle(state: DeviceLifecycleState): void;
   emitLink(url: string): void;
+  emitLocation(position?: DeviceLocationPosition): void;
+  emitLocationError(error?: DeviceError): void;
   emitNetwork(status: DeviceNetworkStatus): void;
   emitRestoredOperation(operation: DeviceRestoredOperation): void;
   clipboardText: string;
   cameraPermission: TestPermissionController;
   hapticEvents: string[];
+  locationPermission: TestPermissionController;
+  locations: DeviceLocationPosition[];
   pickedPhotos: DevicePhoto[];
   openedExternalUrls: string[];
   sharedContent: DeviceShareContent[];
@@ -87,6 +94,7 @@ export const createTestDeviceAdapter = (
   const backListeners = new Set<(event: DeviceBackEvent) => void>();
   const linkListeners = new Set<(url: string) => void>();
   const networkListeners = new Set<(status: DeviceNetworkStatus) => void>();
+  const locationListeners = new Set<(event: DeviceLocationEvent) => void>();
   const values = new Map<string, string>();
   const secureValues = new Map<string, string>();
   const openedExternalUrls: string[] = [];
@@ -96,6 +104,18 @@ export const createTestDeviceAdapter = (
     { canRequest: true, state: "prompt" },
     { canRequest: false, state: "granted" },
   );
+  const locationPermission = createTestPermission(
+    { canRequest: true, state: "prompt" },
+    { canRequest: false, state: "granted" },
+  );
+  const locations: DeviceLocationPosition[] = [
+    {
+      accuracyMeters: 5,
+      latitude: 40.7128,
+      longitude: -74.006,
+      timestampMs: 1_777_000_000_000,
+    },
+  ];
   const pickedPhotos: DevicePhoto[] = [
     {
       format: "jpeg",
@@ -187,6 +207,24 @@ export const createTestDeviceAdapter = (
         openedExternalUrls.push(url);
       },
     },
+    location: {
+      capability: async () => availableCapability("emulated"),
+      current: async () => locations.at(-1)!,
+      queryPermission: async () => ({
+        ...(await locationPermission.permission.queryPermission()),
+        precision: "precise",
+      }),
+      requestPermission: async () => ({
+        ...(await locationPermission.permission.requestPermission()),
+        precision: "precise",
+      }),
+      watch: async (listener) => {
+        locationListeners.add(listener);
+        return () => {
+          locationListeners.delete(listener);
+        };
+      },
+    },
     network: {
       getStatus: async () => networkStatus,
       onChange: async (listener) => {
@@ -250,6 +288,20 @@ export const createTestDeviceAdapter = (
     emitLink: (url) => {
       for (const listener of linkListeners) listener(url);
     },
+    emitLocation: (position = locations.at(-1)!) => {
+      locations.push(position);
+      for (const listener of locationListeners)
+        listener({ position, type: "position" });
+    },
+    emitLocationError: (
+      error = new DeviceError(
+        "temporarily-unavailable",
+        "Test location is unavailable.",
+      ),
+    ) => {
+      for (const listener of locationListeners)
+        listener({ error, type: "error" });
+    },
     emitNetwork: (status) => {
       networkStatus = status;
       for (const listener of networkListeners) listener(status);
@@ -258,6 +310,8 @@ export const createTestDeviceAdapter = (
       for (const listener of restoredListeners) listener(operation);
     },
     hapticEvents,
+    locationPermission,
+    locations,
     openedExternalUrls,
     pickedPhotos,
     secureStorage: secureValues,

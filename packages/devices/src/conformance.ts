@@ -2,6 +2,8 @@ import type {
   DeviceAdapter,
   DeviceBackEvent,
   DeviceLifecycleState,
+  DeviceLocationEvent,
+  DeviceLocationPosition,
   DeviceNetworkStatus,
   DeviceRestoredOperation,
 } from "./contracts";
@@ -13,6 +15,7 @@ export type DeviceAdapterConformanceHarness = {
   emitBack?: (event: DeviceBackEvent) => MaybePromise;
   emitLifecycle: (state: DeviceLifecycleState) => MaybePromise;
   emitLink: (url: string) => MaybePromise;
+  emitLocation?: (position: DeviceLocationPosition) => MaybePromise;
   emitNetwork: (status: DeviceNetworkStatus) => MaybePromise;
   emitRestoredOperation?: (operation: DeviceRestoredOperation) => MaybePromise;
   storage?: boolean;
@@ -124,6 +127,28 @@ export const inspectDeviceAdapterConformance = async (
     await settle(harness.emitBack({ canGoBack: false }));
     if (backEvents.length !== backCount)
       issues.push("back cleanup did not unsubscribe the listener");
+  }
+
+  if (adapter.location && harness.emitLocation) {
+    const locationEvents: DeviceLocationEvent[] = [];
+    const removeLocation = await adapter.location.watch((event) =>
+      locationEvents.push(event),
+    );
+    const position = {
+      accuracyMeters: 5,
+      latitude: 40.7128,
+      longitude: -74.006,
+      timestampMs: 1_777_000_000_000,
+    };
+    await settle(harness.emitLocation(position));
+    const latest = locationEvents.at(-1);
+    if (latest?.type !== "position" || latest.position.latitude !== 40.7128)
+      issues.push("location listener did not receive the emitted position");
+    await removeLocation();
+    const locationCount = locationEvents.length;
+    await settle(harness.emitLocation({ ...position, latitude: 34.0522 }));
+    if (locationEvents.length !== locationCount)
+      issues.push("location cleanup did not unsubscribe the listener");
   }
 
   if (harness.storage) {

@@ -7,6 +7,7 @@ import {
   clipboard,
   haptics,
   lifecycle,
+  location,
   platform,
   photos,
   secureStorage,
@@ -62,10 +63,21 @@ describe("SSR adapter", () => {
         available: false,
         reason: "unavailable",
       });
+      expect(await location.capability()).toMatchObject({
+        available: false,
+        reason: "unavailable",
+      });
+      expect(await location.permission()).toMatchObject({
+        precision: "unknown",
+        state: "unavailable",
+      });
       await expect(camera.takePhoto()).rejects.toMatchObject({
         code: "unavailable",
       });
       await expect(photos.pick()).rejects.toMatchObject({
+        code: "unavailable",
+      });
+      await expect(location.current()).rejects.toMatchObject({
         code: "unavailable",
       });
       await haptics.impact();

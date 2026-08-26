@@ -17,8 +17,16 @@ const entries = [
     "createCapacitorClipboardCapability",
   ],
   [
+    "../packages/devices-capacitor/dist/camera.js",
+    "createCapacitorCameraCapability",
+  ],
+  [
     "../packages/devices-capacitor/dist/haptics.js",
     "createCapacitorHapticsCapability",
+  ],
+  [
+    "../packages/devices-capacitor/dist/location.js",
+    "createCapacitorLocationCapability",
   ],
   [
     "../packages/devices-capacitor/dist/share.js",
@@ -35,7 +43,13 @@ for (const [specifier, exportedName] of entries) {
 const baseAdapter = await Bun.file(
   new URL("../packages/devices-capacitor/dist/index.js", import.meta.url),
 ).text();
-for (const optionalPlugin of ["clipboard", "haptics", "share"]) {
+for (const optionalPlugin of [
+  "camera",
+  "clipboard",
+  "geolocation",
+  "haptics",
+  "share",
+]) {
   if (baseAdapter.includes(`@capacitor/${optionalPlugin}`))
     throw new Error(
       `The base Capacitor adapter unexpectedly imports optional plugin @capacitor/${optionalPlugin}.`,
