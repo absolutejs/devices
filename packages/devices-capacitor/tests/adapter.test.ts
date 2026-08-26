@@ -4,6 +4,7 @@ import {
   availableCapability,
   platform,
   storage,
+  type DeviceLocalNotificationsCapability,
 } from "@absolutejs/devices";
 import { assertDeviceAdapterConformance } from "@absolutejs/devices/testing";
 import {
@@ -144,6 +145,16 @@ const createBindings = (
 };
 
 describe("Capacitor device adapter", () => {
+  test("forwards an injected local notifications capability", () => {
+    const localNotifications = {} as DeviceLocalNotificationsCapability;
+    const adapter = createCapacitorDeviceAdapter({
+      bindings: createBindings().bindings,
+      localNotifications,
+    });
+
+    expect(adapter.localNotifications).toBe(localNotifications);
+  });
+
   test("passes shared conformance with native Capacitor events", async () => {
     const controller = createBindings();
     const adapter = createCapacitorDeviceAdapter({

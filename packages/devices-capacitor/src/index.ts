@@ -19,6 +19,7 @@ import {
   type DeviceCameraCapability,
   type DeviceHapticsCapability,
   type DeviceLocationCapability,
+  type DeviceLocalNotificationsCapability,
   type DeviceNetworkStatus,
   type DevicePlatformInfo,
   type DevicePhotosCapability,
@@ -57,6 +58,7 @@ export type CapacitorDeviceAdapterOptions = {
   documents?: DeviceDocumentsCapability;
   haptics?: DeviceHapticsCapability;
   location?: DeviceLocationCapability;
+  localNotifications?: DeviceLocalNotificationsCapability;
   photos?: DevicePhotosCapability;
   secureStorage?: DeviceSecureStorageCapability;
   share?: DeviceShareCapability;
@@ -357,6 +359,9 @@ export const createCapacitorDeviceAdapter = (
         ),
     },
     ...(options.location === undefined ? {} : { location: options.location }),
+    ...(options.localNotifications === undefined
+      ? {}
+      : { localNotifications: options.localNotifications }),
     network: {
       getStatus: async () =>
         connectionStatus(
