@@ -17,18 +17,22 @@ This repository does not own emulator orchestration. Target provisioning, native
 
 The core implementation covers platform information, lifecycle/resume/restored
 operations, normalized links, network state, Android-style back events, ordinary
-key/value storage, and a deliberately separate secure-storage seam. Camera,
-location, files, notifications, and other permission-sensitive capabilities will
-land as isolated, tree-shakeable slices with conformance tests.
+key/value storage, clipboard, system sharing, haptics, and a deliberately
+separate secure-storage seam. Provider features are isolated, tree-shakeable
+slices: an app that never imports `clipboard`, `share`, or `haptics` does not need
+the corresponding native plugin.
 
 ```ts
 import {
   back,
+  clipboard,
+  haptics,
   lifecycle,
   links,
   network,
   platform,
   secureStorage,
+  share,
 } from "@absolutejs/devices";
 
 const info = await platform.info();
@@ -49,7 +53,17 @@ if ((await back.capability()).available) {
 if ((await secureStorage.capability()).available) {
   await secureStorage.set("credential", "provider-owned-secret");
 }
+
+await clipboard.writeText("Copied everywhere");
+await share.share({ text: "Shared everywhere", url: "https://absolutejs.com" });
+await haptics.impact("light");
 ```
+
+AbsoluteJS discovers these named application imports at mobile initialization
+and reads the selected provider's declarative package metadata. It installs only
+the exact native plugin packages the app uses and generates the adapter wiring;
+application code never edits Capacitor bootstrap code. Capability discovery does
+not request a permission or execute native code.
 
 Sensitive permissions are never requested by importing a module or calling a
 capability query. Every future permission-owning feature uses the normalized

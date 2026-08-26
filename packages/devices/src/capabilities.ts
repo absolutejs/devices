@@ -5,7 +5,10 @@ import {
   type DeviceCapabilityUnavailableReason,
   type DeviceErrorCode,
   type DeviceRuntime,
+  type DeviceShareContent,
 } from "./contracts";
+
+const SHARE_PROTOCOLS = new Set(["http:", "https:"]);
 
 export const availableCapability = (
   fidelity: DeviceCapabilityFidelity,
@@ -55,4 +58,26 @@ export const runtimeCapability = (
   if (runtime === "test") return availableCapability("emulated");
 
   return availableCapability("native");
+};
+
+export const normalizeDeviceShareContent = (
+  content: DeviceShareContent,
+): DeviceShareContent => {
+  const normalized = Object.fromEntries(
+    Object.entries(content).filter(
+      ([, value]) => typeof value === "string" && value.length > 0,
+    ),
+  ) as DeviceShareContent;
+  if (Object.keys(normalized).length === 0)
+    throw new TypeError("Device share content cannot be empty.");
+  if (normalized.url) {
+    const url = new URL(normalized.url);
+    if (url.username || url.password || !SHARE_PROTOCOLS.has(url.protocol))
+      throw new TypeError(
+        "Device share URLs must be credential-free HTTP(S) URLs.",
+      );
+    normalized.url = url.href;
+  }
+
+  return normalized;
 };

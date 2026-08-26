@@ -7,6 +7,8 @@ import type {
   DevicePermissionStatus,
   DevicePlatformInfo,
   DeviceRestoredOperation,
+  DeviceShareContent,
+  DeviceShareResult,
 } from "./contracts";
 import { availableCapability } from "./capabilities";
 export * from "./conformance";
@@ -18,7 +20,10 @@ export type TestDeviceController = {
   emitLink(url: string): void;
   emitNetwork(status: DeviceNetworkStatus): void;
   emitRestoredOperation(operation: DeviceRestoredOperation): void;
+  clipboardText: string;
+  hapticEvents: string[];
   openedExternalUrls: string[];
+  sharedContent: DeviceShareContent[];
   secureStorage: Map<string, string>;
   storage: Map<string, string>;
 };
@@ -82,6 +87,9 @@ export const createTestDeviceAdapter = (
   const values = new Map<string, string>();
   const secureValues = new Map<string, string>();
   const openedExternalUrls: string[] = [];
+  const sharedContent: DeviceShareContent[] = [];
+  const hapticEvents: string[] = [];
+  let clipboardText = "";
   const adapter: DeviceAdapter = {
     runtime: "test",
     back: {
@@ -91,6 +99,28 @@ export const createTestDeviceAdapter = (
         return () => {
           backListeners.delete(listener);
         };
+      },
+    },
+    clipboard: {
+      capability: async () => availableCapability("emulated"),
+      readText: async () => clipboardText,
+      writeText: async (value) => {
+        clipboardText = value;
+      },
+    },
+    haptics: {
+      capability: async () => availableCapability("emulated"),
+      impact: async (style = "medium") => {
+        hapticEvents.push(`impact:${style}`);
+      },
+      notification: async (type = "success") => {
+        hapticEvents.push(`notification:${type}`);
+      },
+      selectionChanged: async () => {
+        hapticEvents.push("selection");
+      },
+      vibrate: async (durationMs = 300) => {
+        hapticEvents.push(`vibrate:${durationMs}`);
       },
     },
     platform: {
@@ -146,6 +176,13 @@ export const createTestDeviceAdapter = (
         };
       },
     },
+    share: {
+      capability: async () => availableCapability("emulated"),
+      share: async (content): Promise<DeviceShareResult> => {
+        sharedContent.push(content);
+        return { activity: "test" };
+      },
+    },
     secureStorage: {
       capability: async () => availableCapability("emulated"),
       clear: async () => secureValues.clear(),
@@ -173,6 +210,9 @@ export const createTestDeviceAdapter = (
 
   return {
     adapter,
+    get clipboardText() {
+      return clipboardText;
+    },
     emitBack: (event = { canGoBack: false }) => {
       for (const listener of backListeners) listener(event);
     },
@@ -192,8 +232,10 @@ export const createTestDeviceAdapter = (
     emitRestoredOperation: (operation) => {
       for (const listener of restoredListeners) listener(operation);
     },
+    hapticEvents,
     openedExternalUrls,
     secureStorage: secureValues,
+    sharedContent,
     storage: values,
   };
 };

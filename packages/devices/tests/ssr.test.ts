@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { DeviceError } from "../src/contracts";
 import { createSsrDeviceAdapter } from "../src/adapters/ssr";
-import { back, lifecycle, platform, secureStorage } from "../src";
+import {
+  back,
+  clipboard,
+  haptics,
+  lifecycle,
+  platform,
+  secureStorage,
+  share,
+} from "../src";
 import { installDeviceAdapter } from "../src/runtime";
 
 describe("SSR adapter", () => {
@@ -35,6 +43,18 @@ describe("SSR adapter", () => {
       expect(await secureStorage.capability()).toMatchObject({
         available: false,
         reason: "unsupported",
+      });
+      expect(await clipboard.capability()).toMatchObject({
+        available: false,
+        reason: "unavailable",
+      });
+      expect(await share.capability()).toMatchObject({
+        available: false,
+        reason: "unavailable",
+      });
+      await haptics.impact();
+      await expect(clipboard.readText()).rejects.toMatchObject({
+        code: "unavailable",
       });
       await expect(secureStorage.get("credential")).rejects.toMatchObject({
         code: "unsupported",

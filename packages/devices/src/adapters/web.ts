@@ -4,7 +4,13 @@ import {
   type DeviceNetworkStatus,
   type DevicePlatformInfo,
   type DeviceSafeAreaInsets,
+  type DeviceShareContent,
 } from "../contracts";
+import {
+  availableCapability,
+  normalizeDeviceShareContent,
+  unavailableCapability,
+} from "../capabilities";
 
 const COARSE_TABLET_MIN_WIDTH = 768;
 
@@ -69,8 +75,98 @@ const requireStorage = () => {
   }
 };
 
+const webFailure = (error: unknown, message: string) => {
+  const name =
+    typeof error === "object" && error !== null
+      ? Reflect.get(error, "name")
+      : undefined;
+  if (name === "AbortError")
+    return new DeviceError("cancelled", "The device action was cancelled.", {
+      cause: error,
+    });
+  if (name === "NotAllowedError")
+    return new DeviceError("permission-denied", message, { cause: error });
+
+  return new DeviceError("failed", message, { cause: error });
+};
+
+const webOperation = async <T>(
+  message: string,
+  operation: () => Promise<T>,
+) => {
+  try {
+    return await operation();
+  } catch (error) {
+    throw webFailure(error, message);
+  }
+};
+
+const clipboardStatus = (operation: "read" | "write") => {
+  const method = operation === "read" ? "readText" : "writeText";
+  return typeof navigator.clipboard?.[method] === "function"
+    ? availableCapability("web")
+    : unavailableCapability(
+        "unsupported",
+        `Clipboard ${operation} is not supported by this browser context.`,
+      );
+};
+
+const shareStatus = (content?: DeviceShareContent) => {
+  if (typeof navigator.share !== "function")
+    return unavailableCapability(
+      "unsupported",
+      "The Web Share API is not supported by this browser.",
+    );
+  if (content && typeof navigator.canShare === "function") {
+    const normalized = normalizeDeviceShareContent(content);
+    if (!navigator.canShare(normalized))
+      return unavailableCapability(
+        "unsupported",
+        "This browser cannot share the requested content.",
+      );
+  }
+
+  return availableCapability("web");
+};
+
+const vibrate = (durationMs: number) => {
+  if (typeof navigator.vibrate === "function") navigator.vibrate(durationMs);
+};
+
 export const createWebDeviceAdapter = (): DeviceAdapter => ({
   runtime: "web",
+  clipboard: {
+    capability: async (operation = "write") => clipboardStatus(operation),
+    readText: async () => {
+      if (!clipboardStatus("read").available)
+        throw new DeviceError("unsupported", "Clipboard read is unavailable.");
+      return webOperation("Browser clipboard read was denied.", () =>
+        navigator.clipboard.readText(),
+      );
+    },
+    writeText: async (value) => {
+      if (!clipboardStatus("write").available)
+        throw new DeviceError("unsupported", "Clipboard write is unavailable.");
+      await webOperation("Browser clipboard write was denied.", () =>
+        navigator.clipboard.writeText(value),
+      );
+    },
+  },
+  haptics: {
+    capability: async () =>
+      typeof navigator.vibrate === "function"
+        ? availableCapability("web")
+        : unavailableCapability(
+            "unsupported",
+            "Vibration feedback is not supported by this browser.",
+          ),
+    impact: async (style = "medium") =>
+      vibrate(style === "light" ? 8 : style === "heavy" ? 24 : 14),
+    notification: async (type = "success") =>
+      vibrate(type === "error" ? 40 : type === "warning" ? 28 : 18),
+    selectionChanged: async () => vibrate(6),
+    vibrate: async (durationMs = 300) => vibrate(durationMs),
+  },
   platform: {
     getInfo: async () => ({
       formFactor: matches("(pointer: coarse)")
@@ -144,6 +240,18 @@ export const createWebDeviceAdapter = (): DeviceAdapter => ({
         removeEventListener("online", handler);
         removeEventListener("offline", handler);
       };
+    },
+  },
+  share: {
+    capability: async (content) => shareStatus(content),
+    share: async (content) => {
+      const normalized = normalizeDeviceShareContent(content);
+      if (!shareStatus(normalized).available)
+        throw new DeviceError("unsupported", "Web sharing is unavailable.");
+      await webOperation("Browser sharing failed.", () =>
+        navigator.share(normalized),
+      );
+      return {};
     },
   },
   storage: {

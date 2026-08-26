@@ -5,7 +5,14 @@ export { installDeviceAdapter } from "./runtime";
 
 import { getDeviceAdapter } from "./runtime";
 import { runtimeCapability, unavailableCapability } from "./capabilities";
-import { DeviceError, type DeviceSubscription } from "./contracts";
+import {
+  DeviceError,
+  type DeviceClipboardOperation,
+  type DeviceHapticImpactStyle,
+  type DeviceHapticNotificationType,
+  type DeviceShareContent,
+  type DeviceSubscription,
+} from "./contracts";
 import { parseDeviceLink } from "./links";
 
 const noopSubscription = (): DeviceSubscription => () => undefined;
@@ -18,6 +25,64 @@ const requireSecureStorage = () => {
     );
 
   return capability;
+};
+const unavailableOptional = (capability: string) =>
+  unavailableCapability(
+    "unsupported",
+    `${capability} is not installed for this runtime.`,
+  );
+
+export const clipboard = {
+  capability: (operation?: DeviceClipboardOperation) =>
+    getDeviceAdapter().clipboard?.capability(operation) ??
+    Promise.resolve(unavailableOptional("Clipboard")),
+  readText: async () => {
+    const capability = getDeviceAdapter().clipboard;
+    if (!capability)
+      throw new DeviceError(
+        "unsupported",
+        "Clipboard is not installed for this runtime.",
+      );
+    return capability.readText();
+  },
+  writeText: async (value: string) => {
+    const capability = getDeviceAdapter().clipboard;
+    if (!capability)
+      throw new DeviceError(
+        "unsupported",
+        "Clipboard is not installed for this runtime.",
+      );
+    return capability.writeText(value);
+  },
+};
+
+export const haptics = {
+  capability: () =>
+    getDeviceAdapter().haptics?.capability() ??
+    Promise.resolve(unavailableOptional("Haptics")),
+  impact: (style?: DeviceHapticImpactStyle) =>
+    getDeviceAdapter().haptics?.impact(style) ?? Promise.resolve(),
+  notification: (type?: DeviceHapticNotificationType) =>
+    getDeviceAdapter().haptics?.notification(type) ?? Promise.resolve(),
+  selectionChanged: () =>
+    getDeviceAdapter().haptics?.selectionChanged() ?? Promise.resolve(),
+  vibrate: (durationMs?: number) =>
+    getDeviceAdapter().haptics?.vibrate(durationMs) ?? Promise.resolve(),
+};
+
+export const share = {
+  capability: (content?: DeviceShareContent) =>
+    getDeviceAdapter().share?.capability(content) ??
+    Promise.resolve(unavailableOptional("Sharing")),
+  share: async (content: DeviceShareContent) => {
+    const capability = getDeviceAdapter().share;
+    if (!capability)
+      throw new DeviceError(
+        "unsupported",
+        "Sharing is not installed for this runtime.",
+      );
+    return capability.share(content);
+  },
 };
 
 export const platform = {

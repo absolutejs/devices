@@ -30,6 +30,9 @@ const installWebEnvironment = () => {
   const documentEvents = new EventTarget();
   const values = new Map<string, string>();
   const opened: string[] = [];
+  const shared: ShareData[] = [];
+  const vibrations: number[] = [];
+  let clipboardText = "";
   let href = "https://app.example.test/start?source=launch#top";
   let online = true;
   let visibilityState: DocumentVisibilityState = "visible";
@@ -62,12 +65,26 @@ const installWebEnvironment = () => {
     },
   };
   const navigator = {
+    canShare: () => true,
+    clipboard: {
+      readText: async () => clipboardText,
+      writeText: async (value: string) => {
+        clipboardText = value;
+      },
+    },
     connection: { type: "wifi" },
     language: "en-US",
     get onLine() {
       return online;
     },
     userAgent: "AbsoluteJS Android Test",
+    share: async (content: ShareData) => {
+      shared.push(content);
+    },
+    vibrate: (duration: number) => {
+      vibrations.push(duration);
+      return true;
+    },
   };
   replaceGlobal(
     "addEventListener",
@@ -116,6 +133,8 @@ const installWebEnvironment = () => {
       );
     },
     opened,
+    shared,
+    vibrations,
   };
 };
 
@@ -152,5 +171,26 @@ describe("web device adapter", () => {
     await expect(
       adapter.links.openExternal("javascript:alert(1)"),
     ).rejects.toBeInstanceOf(DeviceError);
+  });
+
+  test("uses standards-based clipboard, share, and vibration fallbacks", async () => {
+    const environment = installWebEnvironment();
+    const adapter = createWebDeviceAdapter();
+
+    await adapter.clipboard?.writeText("copied");
+    expect(await adapter.clipboard?.readText()).toBe("copied");
+    expect(await adapter.clipboard?.capability("read")).toMatchObject({
+      available: true,
+      fidelity: "web",
+    });
+    await adapter.share?.share({
+      text: "Portable",
+      url: "https://absolutejs.com/path",
+    });
+    await adapter.haptics?.impact("heavy");
+    expect(environment.shared).toEqual([
+      { text: "Portable", url: "https://absolutejs.com/path" },
+    ]);
+    expect(environment.vibrations).toEqual([24]);
   });
 });

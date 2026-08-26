@@ -13,6 +13,30 @@ const unavailable = (capability: string) =>
 
 export const createSsrDeviceAdapter = (): DeviceAdapter => ({
   runtime: "ssr",
+  clipboard: {
+    capability: async () => ({
+      available: false,
+      reason: "unavailable",
+      message: "Clipboard is unavailable during server rendering.",
+    }),
+    readText: async () => {
+      throw unavailable("Clipboard");
+    },
+    writeText: async () => {
+      throw unavailable("Clipboard");
+    },
+  },
+  haptics: {
+    capability: async () => ({
+      available: false,
+      reason: "unavailable",
+      message: "Haptics are unavailable during server rendering.",
+    }),
+    impact: async () => undefined,
+    notification: async () => undefined,
+    selectionChanged: async () => undefined,
+    vibrate: async () => undefined,
+  },
   platform: {
     getInfo: async () => ({
       formFactor: "unknown",
@@ -39,6 +63,16 @@ export const createSsrDeviceAdapter = (): DeviceAdapter => ({
   network: {
     getStatus: async () => ({ connected: false, connectionType: "unknown" }),
     onChange: async () => noopSubscription(),
+  },
+  share: {
+    capability: async () => ({
+      available: false,
+      reason: "unavailable",
+      message: "Sharing is unavailable during server rendering.",
+    }),
+    share: async () => {
+      throw unavailable("Sharing");
+    },
   },
   storage: {
     clear: async () => {

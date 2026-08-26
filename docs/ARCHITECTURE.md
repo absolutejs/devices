@@ -33,16 +33,18 @@ is visible through the other.
 - SSR imports never touch `window`, `navigator`, or a native bridge.
 - Ordinary and secure storage are different capabilities.
 - Provider-native values may be exposed only in an optional diagnostic field.
-- Adapter packages are independently tree-shakeable and do not install every native plugin.
+- Adapter capabilities are independent subpath entries and do not pull every native plugin into the base adapter.
 
 ## Core surface
 
 The root facade remains import-only for applications and delegates to one installed
 adapter. `platform.info()`, `network.status()`, normalized launch/inbound links,
 lifecycle/resume/restored-operation listeners, and ordinary storage work without
-provider branches. Back interception and secure storage are optional adapter
-features: their capability queries return a discriminated unavailable result and
-their unsafe effects fail with a typed error when no provider is installed.
+provider branches. Back interception, clipboard, sharing, haptics, and secure
+storage are optional adapter features. Their capability queries return a
+discriminated unavailable result. Clipboard and sharing fail with a typed error
+when unavailable; haptic effects safely degrade to a no-op so tactile feedback
+never becomes required for an application action.
 
 Capability status distinguishes native, web-standard, and emulated fidelity from
 unsupported, runtime-unavailable, permission-required, and policy-blocked states.
@@ -78,6 +80,14 @@ baseline App, Browser, Network, and Preferences plugins are runtime infrastructu
 used by navigation, auth, connectivity/Sync, and compatibility state; future
 permission-sensitive APIs remain separate slices and must not install plugins or
 request permissions merely because the base adapter is present.
+
+Clipboard, Share, and Haptics are separate package exports. The base adapter
+accepts their provider-neutral implementations through options and contains no
+imports of those optional Capacitor plugins. The package publishes a validated,
+versioned `absolutejs.devices` manifest that maps each capability to its factory,
+subpath, and exact tested native package version. AbsoluteJS owns source discovery,
+dependency installation, and generated bootstrap wiring. This keeps the manifest
+declarative and prevents a dependency package from executing installation code.
 
 Automatic bootstrap installs the adapter only when Capacitor reports a native
 platform. Browser previews retain the web adapter. Secure storage remains absent

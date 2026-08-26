@@ -14,11 +14,14 @@ import {
   normalizeDeviceError,
   unavailableCapability,
   type DeviceAdapter,
+  type DeviceClipboardCapability,
+  type DeviceHapticsCapability,
   type DeviceNetworkStatus,
   type DevicePlatformInfo,
   type DeviceRestoredOperation,
   type DeviceSafeAreaInsets,
   type DeviceSecureStorageCapability,
+  type DeviceShareCapability,
   type DeviceSubscription,
 } from "@absolutejs/devices";
 import { createCapacitorSecureStorage } from "./secureStorage";
@@ -45,7 +48,10 @@ export type CapacitorDeviceBindings = {
 
 export type CapacitorDeviceAdapterOptions = {
   bindings?: CapacitorDeviceBindings;
+  clipboard?: DeviceClipboardCapability;
+  haptics?: DeviceHapticsCapability;
   secureStorage?: DeviceSecureStorageCapability;
+  share?: DeviceShareCapability;
   storagePrefix?: string;
 };
 
@@ -237,6 +243,10 @@ export const createCapacitorDeviceAdapter = (
         );
       },
     },
+    ...(options.clipboard === undefined
+      ? {}
+      : { clipboard: options.clipboard }),
+    ...(options.haptics === undefined ? {} : { haptics: options.haptics }),
     platform: {
       getInfo: async () => {
         const info = await callProvider(
@@ -355,6 +365,7 @@ export const createCapacitorDeviceAdapter = (
       },
     },
     ...(secureStorage === undefined ? {} : { secureStorage }),
+    ...(options.share === undefined ? {} : { share: options.share }),
     storage: {
       clear: async () =>
         callProvider("Failed to clear native preferences.", async () => {

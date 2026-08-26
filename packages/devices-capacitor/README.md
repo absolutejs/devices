@@ -13,7 +13,8 @@ The release-candidate adapter covers:
 - Android hardware-back events with an explicit capability check; and
 - namespaced ordinary preferences that never clear another package's keys; and
 - an Absolute-owned native credential vault backed by iOS Keychain and Android
-  Keystore AES-256-GCM encryption.
+  Keystore AES-256-GCM encryption; plus
+- opt-in Clipboard, Share, and Haptics provider slices.
 
 `Preferences` is never used for credentials. On a native build the adapter
 selects `AbsoluteSecureStorage` automatically when Capacitor has registered the
@@ -29,6 +30,19 @@ const remove = installCapacitorDeviceAdapterIfNative();
 The conditional helper returns `null` in a browser preview, preserving the core
 web adapter. AbsoluteJS owns this bootstrap call; application code normally does
 not invoke it.
+
+Optional capabilities are intentionally separate exports:
+
+```ts
+import { createCapacitorClipboardCapability } from "@absolutejs/devices-capacitor/clipboard";
+import { createCapacitorHapticsCapability } from "@absolutejs/devices-capacitor/haptics";
+import { createCapacitorShareCapability } from "@absolutejs/devices-capacitor/share";
+```
+
+The `absolutejs.devices` field in this package's `package.json` declares the
+factory and exact tested Capacitor dependency for each slice. The AbsoluteJS CLI
+consumes that metadata and generates these imports; users keep importing the
+provider-neutral facade only. The base entry does not import these plugins.
 
 The JavaScript contract and native sources are tested in CI; release acceptance
 still requires the real iOS/Android simulator checklist because native Keychain

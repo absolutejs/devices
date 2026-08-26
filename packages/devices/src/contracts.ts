@@ -155,6 +155,44 @@ export type DeviceStorageCapability = {
   set(key: string, value: string): Promise<void>;
 };
 
+export type DeviceClipboardOperation = "read" | "write";
+
+export type DeviceClipboardCapability = {
+  capability(
+    operation?: DeviceClipboardOperation,
+  ): Promise<DeviceCapabilityStatus>;
+  readText(): Promise<string>;
+  writeText(value: string): Promise<void>;
+};
+
+export type DeviceShareContent = {
+  dialogTitle?: string;
+  text?: string;
+  title?: string;
+  url?: string;
+};
+
+export type DeviceShareResult = {
+  activity?: string;
+  native?: unknown;
+};
+
+export type DeviceShareCapability = {
+  capability(content?: DeviceShareContent): Promise<DeviceCapabilityStatus>;
+  share(content: DeviceShareContent): Promise<DeviceShareResult>;
+};
+
+export type DeviceHapticImpactStyle = "heavy" | "light" | "medium";
+export type DeviceHapticNotificationType = "error" | "success" | "warning";
+
+export type DeviceHapticsCapability = {
+  capability(): Promise<DeviceCapabilityStatus>;
+  impact(style?: DeviceHapticImpactStyle): Promise<void>;
+  notification(type?: DeviceHapticNotificationType): Promise<void>;
+  selectionChanged(): Promise<void>;
+  vibrate(durationMs?: number): Promise<void>;
+};
+
 export type DeviceSecureStorageCapability = DeviceStorageCapability & {
   capability(): Promise<DeviceCapabilityStatus>;
   /** Serialize a sensitive read/network/write exchange with native workers. */
@@ -163,11 +201,14 @@ export type DeviceSecureStorageCapability = DeviceStorageCapability & {
 
 export type DeviceAdapter = {
   back?: DeviceBackCapability;
+  clipboard?: DeviceClipboardCapability;
+  haptics?: DeviceHapticsCapability;
   lifecycle: DeviceLifecycleCapability;
   links: DeviceLinksCapability;
   network: DeviceNetworkCapability;
   platform: DevicePlatformCapability;
   runtime: DeviceRuntime;
   secureStorage?: DeviceSecureStorageCapability;
+  share?: DeviceShareCapability;
   storage: DeviceStorageCapability;
 };

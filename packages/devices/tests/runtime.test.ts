@@ -4,11 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   back,
+  clipboard,
+  haptics,
   lifecycle,
   links,
   network,
   platform,
   secureStorage,
+  share,
   storage,
 } from "../src";
 import { installDeviceAdapter } from "../src/runtime";
@@ -57,6 +60,32 @@ describe("@absolutejs/devices runtime", () => {
     await removeNetwork();
     testDevice.emitLifecycle("active");
     expect(lifecycleStates).toEqual(["background"]);
+  });
+
+  test("delegates clipboard, share, and haptics without platform branches", async () => {
+    const testDevice = createTestDeviceAdapter();
+    cleanup = installDeviceAdapter(testDevice.adapter);
+
+    await clipboard.writeText("portable");
+    expect(await clipboard.readText()).toBe("portable");
+    expect(await clipboard.capability("read")).toMatchObject({
+      available: true,
+      fidelity: "emulated",
+    });
+    expect(
+      await share.share({ text: "AbsoluteJS", url: "https://absolutejs.com" }),
+    ).toEqual({ activity: "test" });
+    await haptics.impact("light");
+    await haptics.notification("warning");
+    await haptics.selectionChanged();
+    expect(testDevice.sharedContent).toEqual([
+      { text: "AbsoluteJS", url: "https://absolutejs.com" },
+    ]);
+    expect(testDevice.hapticEvents).toEqual([
+      "impact:light",
+      "notification:warning",
+      "selection",
+    ]);
   });
 
   test("exposes resume, restored-operation, back, and external-link behavior", async () => {
