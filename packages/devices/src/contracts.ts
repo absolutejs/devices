@@ -322,6 +322,37 @@ export type DeviceHapticsCapability = {
   vibrate(durationMs?: number): Promise<void>;
 };
 
+export type DeviceKeyboardState = {
+  /** Best available keyboard height in CSS pixels. */
+  heightPx: number;
+  visible: boolean;
+};
+
+export type DeviceKeyboardCapability = {
+  capability(): Promise<DeviceCapabilityStatus>;
+  dismiss(): Promise<void>;
+  getState(): Promise<DeviceKeyboardState>;
+  onChange(
+    listener: (state: DeviceKeyboardState) => void,
+  ): Promise<DeviceSubscription>;
+};
+
+export type DeviceSystemBar = "all" | "navigation" | "status";
+export type DeviceSystemBarAppearance = "automatic" | "dark" | "light";
+export type DeviceSystemBarsOperation = "appearance" | "visibility";
+
+export type DeviceSystemBarsCapability = {
+  capability(
+    operation?: DeviceSystemBarsOperation,
+  ): Promise<DeviceCapabilityStatus>;
+  /** Sets the foreground icon/text appearance, not a background color. */
+  setAppearance(
+    appearance: DeviceSystemBarAppearance,
+    bar?: DeviceSystemBar,
+  ): Promise<void>;
+  setVisible(visible: boolean, bar?: DeviceSystemBar): Promise<void>;
+};
+
 export type DeviceLocationPrecision = "coarse" | "precise";
 
 export type DeviceLocationPermissionStatus = DevicePermissionStatus & {
@@ -422,6 +453,7 @@ export type DeviceAdapter = {
   clipboard?: DeviceClipboardCapability;
   documents?: DeviceDocumentsCapability;
   haptics?: DeviceHapticsCapability;
+  keyboard?: DeviceKeyboardCapability;
   lifecycle: DeviceLifecycleCapability;
   links: DeviceLinksCapability;
   localNotifications?: DeviceLocalNotificationsCapability;
@@ -434,4 +466,5 @@ export type DeviceAdapter = {
   secureStorage?: DeviceSecureStorageCapability;
   share?: DeviceShareCapability;
   storage: DeviceStorageCapability;
+  systemBars?: DeviceSystemBarsCapability;
 };

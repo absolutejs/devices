@@ -25,6 +25,10 @@ const entries = [
     "createCapacitorHapticsCapability",
   ],
   [
+    "../packages/devices-capacitor/dist/keyboard.js",
+    "createCapacitorKeyboardCapability",
+  ],
+  [
     "../packages/devices-capacitor/dist/location.js",
     "createCapacitorLocationCapability",
   ],
@@ -35,6 +39,10 @@ const entries = [
   [
     "../packages/devices-capacitor/dist/share.js",
     "createCapacitorShareCapability",
+  ],
+  [
+    "../packages/devices-capacitor/dist/systemBars.js",
+    "createCapacitorSystemBarsCapability",
   ],
 ] as const;
 
@@ -52,6 +60,7 @@ for (const optionalPlugin of [
   "clipboard",
   "geolocation",
   "haptics",
+  "keyboard",
   "local-notifications",
   "share",
 ]) {

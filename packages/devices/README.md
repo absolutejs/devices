@@ -13,6 +13,8 @@ The pre-1.0 core includes:
 - provider-neutral clipboard, system-share, safely degrading haptic, explicit
   camera-permission, item-scoped photo-picker, and foreground location
   contracts;
+- portable keyboard visibility/height/dismissal and modern edge-to-edge system
+  bar appearance/visibility contracts;
 - bounded document selection, export, and preview without exposing native
   filesystem paths;
 - explicit-permission local notification scheduling, cancellation, pending
@@ -36,16 +38,25 @@ import {
   clipboard,
   documents,
   haptics,
+  keyboard,
   location,
   localNotifications,
   photos,
   pushNotifications,
   share,
+  systemBars,
 } from "@absolutejs/devices";
 
 await clipboard.writeText("Copied");
 await share.share({ text: "Hello from AbsoluteJS" });
 await haptics.impact("light");
+const removeKeyboard = await keyboard.onChange(({ visible, heightPx }) => {
+  document.documentElement.style.setProperty(
+    "--absolute-keyboard-height",
+    visible ? `${heightPx}px` : "0px",
+  );
+});
+await systemBars.setAppearance("light", "status");
 const [document] = await documents.pick({
   accept: ["application/pdf", ".csv"],
   limit: 1,

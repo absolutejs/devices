@@ -7,12 +7,14 @@ import {
   clipboard,
   documents,
   haptics,
+  keyboard,
   lifecycle,
   location,
   platform,
   photos,
   secureStorage,
   share,
+  systemBars,
 } from "../src";
 import { installDeviceAdapter } from "../src/runtime";
 
@@ -72,6 +74,18 @@ describe("SSR adapter", () => {
         available: false,
         reason: "unavailable",
       });
+      expect(await keyboard.capability()).toMatchObject({
+        available: false,
+        reason: "unavailable",
+      });
+      expect(await keyboard.getState()).toEqual({
+        heightPx: 0,
+        visible: false,
+      });
+      expect(await systemBars.capability()).toMatchObject({
+        available: false,
+        reason: "unavailable",
+      });
       expect(await location.permission()).toMatchObject({
         precision: "unknown",
         state: "unavailable",
@@ -92,6 +106,12 @@ describe("SSR adapter", () => {
       await expect(documents.pick()).rejects.toMatchObject({
         code: "unavailable",
       });
+      await expect(keyboard.dismiss()).rejects.toMatchObject({
+        code: "unavailable",
+      });
+      await expect(systemBars.setAppearance("automatic")).rejects.toMatchObject(
+        { code: "unavailable" },
+      );
       await expect(secureStorage.get("credential")).rejects.toMatchObject({
         code: "unsupported",
       });

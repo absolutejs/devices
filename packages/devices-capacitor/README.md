@@ -24,6 +24,8 @@ The release-candidate adapter covers:
   scheduling, cancellation, pending inspection, and receipt/tap events.
 - opt-in Push Notifications through Capacitor 8.1.2, with provider tokens
   confined to the generated authenticated registration bridge.
+- opt-in Keyboard 8.0.5 visibility/height events and dismissal, plus the
+  Capacitor 8 core SystemBars API for modern edge-to-edge status/navigation UI.
 
 `Preferences` is never used for credentials. On a native build the adapter
 selects `AbsoluteSecureStorage` automatically when Capacitor has registered the
@@ -49,11 +51,13 @@ import {
   createCapacitorPhotosCapability,
 } from "@absolutejs/devices-capacitor/camera";
 import { createCapacitorHapticsCapability } from "@absolutejs/devices-capacitor/haptics";
+import { createCapacitorKeyboardCapability } from "@absolutejs/devices-capacitor/keyboard";
 import { createCapacitorLocationCapability } from "@absolutejs/devices-capacitor/location";
 import { createCapacitorLocalNotificationsCapability } from "@absolutejs/devices-capacitor/local-notifications";
 import { createCapacitorPushNotificationsCapability } from "@absolutejs/devices-capacitor/push-notifications";
 import { createCapacitorDocumentsCapability } from "@absolutejs/devices-capacitor/documents";
 import { createCapacitorShareCapability } from "@absolutejs/devices-capacitor/share";
+import { createCapacitorSystemBarsCapability } from "@absolutejs/devices-capacitor/system-bars";
 ```
 
 The `absolutejs.devices` field in this package's `package.json` declares the
@@ -64,6 +68,11 @@ permissions. Foreground location adds only coarse/fine Android permissions and
 the provider-required iOS usage strings. Users keep importing the
 provider-neutral facade only. The base
 entry does not import these plugins.
+
+System bars use Capacitor 8's core edge-to-edge API rather than the legacy
+Status Bar plugin. Public `light`/`dark` values name foreground icon/text color,
+avoiding the provider enum's background-oriented wording. Browser appearance is
+best-effort through `color-scheme`; browser chrome visibility fails explicitly.
 
 Documents use the WebView's system-backed file input for scoped selection, so
 selected content remains Blob-backed and path-free. Export and preview stage a

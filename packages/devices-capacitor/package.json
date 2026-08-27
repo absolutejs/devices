@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/devices-capacitor",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Capacitor runtime adapter for @absolutejs/devices",
   "type": "module",
   "license": "BSL-1.1",
@@ -52,6 +52,10 @@
       "types": "./dist/haptics.d.ts",
       "import": "./dist/haptics.js"
     },
+    "./keyboard": {
+      "types": "./dist/keyboard.d.ts",
+      "import": "./dist/keyboard.js"
+    },
     "./location": {
       "types": "./dist/location.d.ts",
       "import": "./dist/location.js"
@@ -71,13 +75,17 @@
     "./share": {
       "types": "./dist/share.d.ts",
       "import": "./dist/share.js"
+    },
+    "./system-bars": {
+      "types": "./dist/systemBars.d.ts",
+      "import": "./dist/systemBars.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "bun build src/index.ts src/camera.ts src/clipboard.ts src/documents.ts src/haptics.ts src/localNotifications.ts src/location.ts src/pushNotifications.ts src/share.ts --root src --outdir dist --target=browser --external @absolutejs/devices --external @capacitor/core --external @capacitor/app --external @capacitor/browser --external @capacitor/camera --external @capacitor/clipboard --external @capacitor/file-viewer --external @capacitor/filesystem --external @capacitor/geolocation --external @capacitor/haptics --external @capacitor/local-notifications --external @capacitor/network --external @capacitor/preferences --external @capacitor/push-notifications --external @capacitor/share && tsc --emitDeclarationOnly -p tsconfig.build.json",
+    "build": "bun build src/index.ts src/camera.ts src/clipboard.ts src/documents.ts src/haptics.ts src/keyboard.ts src/localNotifications.ts src/location.ts src/pushNotifications.ts src/share.ts src/systemBars.ts --root src --outdir dist --target=browser --external @absolutejs/devices --external @capacitor/core --external @capacitor/app --external @capacitor/browser --external @capacitor/camera --external @capacitor/clipboard --external @capacitor/file-viewer --external @capacitor/filesystem --external @capacitor/geolocation --external @capacitor/haptics --external @capacitor/keyboard --external @capacitor/local-notifications --external @capacitor/network --external @capacitor/preferences --external @capacitor/push-notifications --external @capacitor/share && tsc --emitDeclarationOnly -p tsconfig.build.json",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -87,7 +95,7 @@
     "@capacitor/preferences": "^8.0.0"
   },
   "peerDependencies": {
-    "@absolutejs/devices": "^0.6.0",
+    "@absolutejs/devices": "^0.7.0",
     "@capacitor/camera": ">=8.1 <9",
     "@capacitor/clipboard": ">=8 <9",
     "@capacitor/core": ">=8 <9",
@@ -95,6 +103,7 @@
     "@capacitor/filesystem": ">=8.1 <9",
     "@capacitor/geolocation": ">=8.2 <9",
     "@capacitor/haptics": ">=8 <9",
+    "@capacitor/keyboard": ">=8 <9",
     "@capacitor/local-notifications": ">=8.2 <8.3",
     "@capacitor/push-notifications": ">=8.1 <9",
     "@capacitor/share": ">=8 <9"
@@ -118,6 +127,9 @@
     "@capacitor/haptics": {
       "optional": true
     },
+    "@capacitor/keyboard": {
+      "optional": true
+    },
     "@capacitor/local-notifications": {
       "optional": true
     },
@@ -136,6 +148,7 @@
     "@capacitor/filesystem": "8.1.3",
     "@capacitor/geolocation": "8.2.2",
     "@capacitor/haptics": "8.0.2",
+    "@capacitor/keyboard": "8.0.5",
     "@capacitor/local-notifications": "8.2.1",
     "@capacitor/push-notifications": "8.1.2",
     "@capacitor/share": "8.0.1"
@@ -189,6 +202,13 @@
           "module": "@absolutejs/devices-capacitor/haptics",
           "packages": [
             "@capacitor/haptics@8.0.2"
+          ]
+        },
+        "keyboard": {
+          "factory": "createCapacitorKeyboardCapability",
+          "module": "@absolutejs/devices-capacitor/keyboard",
+          "packages": [
+            "@capacitor/keyboard@8.0.5"
           ]
         },
         "location": {
@@ -265,6 +285,16 @@
           "packages": [
             "@capacitor/share@8.0.1"
           ]
+        },
+        "systemBars": {
+          "factory": "createCapacitorSystemBarsCapability",
+          "module": "@absolutejs/devices-capacitor/system-bars",
+          "packages": [],
+          "native": {
+            "ios": {
+              "systemBars": true
+            }
+          }
         }
       },
       "format": 1,

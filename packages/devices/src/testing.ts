@@ -2,6 +2,7 @@ import type {
   DeviceAdapter,
   DeviceBackEvent,
   DeviceLifecycleState,
+  DeviceKeyboardState,
   DeviceLocationEvent,
   DeviceLocationPosition,
   DeviceLocalNotification,
@@ -28,6 +29,7 @@ export type TestDeviceController = {
   adapter: DeviceAdapter;
   emitBack(event?: DeviceBackEvent): void;
   emitLifecycle(state: DeviceLifecycleState): void;
+  emitKeyboard(state: DeviceKeyboardState): void;
   emitLink(url: string): void;
   emitLocation(position?: DeviceLocationPosition): void;
   emitLocationError(error?: DeviceError): void;
@@ -42,6 +44,7 @@ export type TestDeviceController = {
   clipboardText: string;
   cameraPermission: TestPermissionController;
   hapticEvents: string[];
+  keyboardState: DeviceKeyboardState;
   locationPermission: TestPermissionController;
   notificationPermission: TestPermissionController;
   locations: DeviceLocationPosition[];
@@ -54,6 +57,7 @@ export type TestDeviceController = {
   sharedContent: DeviceShareContent[];
   secureStorage: Map<string, string>;
   storage: Map<string, string>;
+  systemBarEvents: string[];
 };
 
 export type TestPermissionController = {
@@ -113,6 +117,7 @@ export const createTestDeviceAdapter = (
   const linkListeners = new Set<(url: string) => void>();
   const networkListeners = new Set<(status: DeviceNetworkStatus) => void>();
   const locationListeners = new Set<(event: DeviceLocationEvent) => void>();
+  const keyboardListeners = new Set<(state: DeviceKeyboardState) => void>();
   const notificationActionListeners = new Set<
     (action: DeviceLocalNotificationAction) => void
   >();
@@ -124,6 +129,8 @@ export const createTestDeviceAdapter = (
   const openedExternalUrls: string[] = [];
   const sharedContent: DeviceShareContent[] = [];
   const hapticEvents: string[] = [];
+  const systemBarEvents: string[] = [];
+  let keyboardState: DeviceKeyboardState = { heightPx: 0, visible: false };
   const cameraPermission = createTestPermission(
     { canRequest: true, state: "prompt" },
     { canRequest: false, state: "granted" },
@@ -226,6 +233,20 @@ export const createTestDeviceAdapter = (
       },
       vibrate: async (durationMs = 300) => {
         hapticEvents.push(`vibrate:${durationMs}`);
+      },
+    },
+    keyboard: {
+      capability: async () => availableCapability("emulated"),
+      dismiss: async () => {
+        keyboardState = { heightPx: 0, visible: false };
+        for (const listener of keyboardListeners) listener(keyboardState);
+      },
+      getState: async () => keyboardState,
+      onChange: async (listener) => {
+        keyboardListeners.add(listener);
+        return () => {
+          keyboardListeners.delete(listener);
+        };
       },
     },
     localNotifications: {
@@ -382,6 +403,15 @@ export const createTestDeviceAdapter = (
         values.set(key, value);
       },
     },
+    systemBars: {
+      capability: async () => availableCapability("emulated"),
+      setAppearance: async (appearance, bar = "all") => {
+        systemBarEvents.push(`appearance:${bar}:${appearance}`);
+      },
+      setVisible: async (visible, bar = "all") => {
+        systemBarEvents.push(`visible:${bar}:${String(visible)}`);
+      },
+    },
   };
 
   return {
@@ -398,6 +428,10 @@ export const createTestDeviceAdapter = (
       for (const listener of lifecycleListeners) listener(state);
       if (state === "active")
         for (const listener of resumeListeners) listener();
+    },
+    emitKeyboard: (state) => {
+      keyboardState = state;
+      for (const listener of keyboardListeners) listener(state);
     },
     emitLink: (url) => {
       for (const listener of linkListeners) listener(url);
@@ -448,6 +482,9 @@ export const createTestDeviceAdapter = (
       for (const listener of restoredListeners) listener(operation);
     },
     hapticEvents,
+    get keyboardState() {
+      return keyboardState;
+    },
     locationPermission,
     locations,
     notificationPermission,
@@ -460,5 +497,6 @@ export const createTestDeviceAdapter = (
     secureStorage: secureValues,
     sharedContent,
     storage: values,
+    systemBarEvents,
   };
 };

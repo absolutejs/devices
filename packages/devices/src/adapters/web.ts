@@ -12,6 +12,7 @@ import {
   type DeviceLocationPermissionStatus,
   type DeviceLocationPosition,
   type DeviceLocationWatchOptions,
+  type DeviceKeyboardState,
   type DeviceLocalNotification,
   type DevicePickDocumentsOptions,
   type DeviceWriteDocumentOptions,
@@ -76,6 +77,26 @@ const safeAreaInsets = (): DeviceSafeAreaInsets => {
 
 const matches = (query: string) =>
   typeof matchMedia === "function" && matchMedia(query).matches;
+
+const editableElement = (value: Element | null) =>
+  value instanceof HTMLInputElement ||
+  value instanceof HTMLTextAreaElement ||
+  (value instanceof HTMLElement && value.isContentEditable);
+
+const webKeyboardState = (): DeviceKeyboardState => {
+  const viewport = window.visualViewport;
+  const heightPx = viewport
+    ? Math.max(
+        0,
+        Math.round(window.innerHeight - viewport.height - viewport.offsetTop),
+      )
+    : 0;
+
+  return {
+    heightPx,
+    visible: editableElement(document.activeElement) && heightPx > 50,
+  };
+};
 
 const requireStorage = () => {
   try {
@@ -624,6 +645,41 @@ export const createWebDeviceAdapter = (): DeviceAdapter => {
       selectionChanged: async () => vibrate(6),
       vibrate: async (durationMs = 300) => vibrate(durationMs),
     },
+    keyboard: {
+      capability: async () =>
+        typeof window.visualViewport === "undefined"
+          ? unavailableCapability(
+              "unsupported",
+              "This browser does not expose keyboard viewport changes.",
+            )
+          : availableCapability("web"),
+      dismiss: async () => {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement) active.blur();
+      },
+      getState: async () => webKeyboardState(),
+      onChange: async (listener) => {
+        let previous = webKeyboardState();
+        const emit = () => {
+          const next = webKeyboardState();
+          if (
+            next.visible === previous.visible &&
+            next.heightPx === previous.heightPx
+          )
+            return;
+          previous = next;
+          listener(next);
+        };
+        window.visualViewport?.addEventListener("resize", emit);
+        document.addEventListener("focusin", emit);
+        document.addEventListener("focusout", emit);
+        return () => {
+          window.visualViewport?.removeEventListener("resize", emit);
+          document.removeEventListener("focusin", emit);
+          document.removeEventListener("focusout", emit);
+        };
+      },
+    },
     localNotifications: {
       cancel: async (ids) => {
         for (const id of ids) {
@@ -870,6 +926,31 @@ export const createWebDeviceAdapter = (): DeviceAdapter => {
       },
       remove: async (key) => requireStorage().removeItem(key),
       set: async (key, value) => requireStorage().setItem(key, value),
+    },
+    systemBars: {
+      capability: async (operation = "appearance") =>
+        operation === "appearance"
+          ? availableCapability("emulated", {
+              targetedBars: false,
+            })
+          : unavailableCapability(
+              "unsupported",
+              "Browser chrome visibility cannot be controlled reliably.",
+            ),
+      setAppearance: async (appearance) => {
+        document.documentElement.style.colorScheme =
+          appearance === "automatic"
+            ? "normal"
+            : appearance === "light"
+              ? "dark"
+              : "light";
+      },
+      setVisible: async () => {
+        throw new DeviceError(
+          "unsupported",
+          "Browser chrome visibility cannot be controlled reliably.",
+        );
+      },
     },
   };
 };

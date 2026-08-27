@@ -68,6 +68,18 @@ export const createSsrDeviceAdapter = (): DeviceAdapter => ({
     selectionChanged: async () => undefined,
     vibrate: async () => undefined,
   },
+  keyboard: {
+    capability: async () => ({
+      available: false,
+      reason: "unavailable",
+      message: "Keyboard state is unavailable during server rendering.",
+    }),
+    dismiss: async () => {
+      throw unavailable("Keyboard");
+    },
+    getState: async () => ({ heightPx: 0, visible: false }),
+    onChange: async () => noopSubscription(),
+  },
   localNotifications: {
     cancel: async () => {
       throw unavailable("Local notifications");
@@ -194,6 +206,19 @@ export const createSsrDeviceAdapter = (): DeviceAdapter => ({
     },
     set: async () => {
       throw unavailable("Storage");
+    },
+  },
+  systemBars: {
+    capability: async () => ({
+      available: false,
+      reason: "unavailable",
+      message: "System bars are unavailable during server rendering.",
+    }),
+    setAppearance: async () => {
+      throw unavailable("System bars");
+    },
+    setVisible: async () => {
+      throw unavailable("System bars");
     },
   },
 });

@@ -15,6 +15,7 @@ import {
   type DeviceWriteDocumentOptions,
   type DeviceHapticImpactStyle,
   type DeviceHapticNotificationType,
+  type DeviceKeyboardState,
   type DeviceLocationEvent,
   type DeviceLocationOptions,
   type DeviceLocationPermissionOptions,
@@ -26,6 +27,9 @@ import {
   type DeviceScheduleLocalNotification,
   type DeviceShareContent,
   type DeviceSubscription,
+  type DeviceSystemBar,
+  type DeviceSystemBarAppearance,
+  type DeviceSystemBarsOperation,
 } from "./contracts";
 import { parseDeviceLink } from "./links";
 
@@ -175,6 +179,20 @@ export const haptics = {
     getDeviceAdapter().haptics?.selectionChanged() ?? Promise.resolve(),
   vibrate: (durationMs?: number) =>
     getDeviceAdapter().haptics?.vibrate(durationMs) ?? Promise.resolve(),
+};
+
+export const keyboard = {
+  capability: () =>
+    getDeviceAdapter().keyboard?.capability() ??
+    Promise.resolve(unavailableOptional("Keyboard")),
+  dismiss: () =>
+    requireOptional(getDeviceAdapter().keyboard, "Keyboard").dismiss(),
+  getState: () =>
+    requireOptional(getDeviceAdapter().keyboard, "Keyboard").getState(),
+  onChange: (listener: (state: DeviceKeyboardState) => void) =>
+    requireOptional(getDeviceAdapter().keyboard, "Keyboard").onChange(listener),
+  state: () =>
+    requireOptional(getDeviceAdapter().keyboard, "Keyboard").getState(),
 };
 
 export const localNotifications = {
@@ -414,4 +432,23 @@ export const storage = {
   remove: (key: string) => getDeviceAdapter().storage.remove(key),
   set: (key: string, value: string) =>
     getDeviceAdapter().storage.set(key, value),
+};
+
+export const systemBars = {
+  capability: (operation?: DeviceSystemBarsOperation) =>
+    getDeviceAdapter().systemBars?.capability(operation) ??
+    Promise.resolve(unavailableOptional("System bars")),
+  setAppearance: (
+    appearance: DeviceSystemBarAppearance,
+    bar?: DeviceSystemBar,
+  ) =>
+    requireOptional(getDeviceAdapter().systemBars, "System bars").setAppearance(
+      appearance,
+      bar,
+    ),
+  setVisible: (visible: boolean, bar?: DeviceSystemBar) =>
+    requireOptional(getDeviceAdapter().systemBars, "System bars").setVisible(
+      visible,
+      bar,
+    ),
 };

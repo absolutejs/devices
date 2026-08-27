@@ -17,8 +17,9 @@ This repository does not own emulator orchestration. Target provisioning, native
 
 The core implementation covers platform information, lifecycle/resume/restored
 operations, normalized links, network state, Android-style back events, ordinary
-key/value storage, clipboard, system sharing, haptics, local notifications, and
-a deliberately separate secure-storage seam. Provider features are isolated, tree-shakeable
+key/value storage, clipboard, system sharing, haptics, local notifications, a
+portable keyboard/system-bars surface, and a deliberately separate
+secure-storage seam. Provider features are isolated, tree-shakeable
 slices: an app that never imports `clipboard`, `share`, or `haptics` does not need
 the corresponding native plugin.
 
@@ -27,12 +28,14 @@ import {
   back,
   clipboard,
   haptics,
+  keyboard,
   lifecycle,
   links,
   network,
   platform,
   secureStorage,
   share,
+  systemBars,
 } from "@absolutejs/devices";
 
 const info = await platform.info();
@@ -57,6 +60,8 @@ if ((await secureStorage.capability()).available) {
 await clipboard.writeText("Copied everywhere");
 await share.share({ text: "Shared everywhere", url: "https://absolutejs.com" });
 await haptics.impact("light");
+await keyboard.dismiss();
+await systemBars.setAppearance("light", "status");
 ```
 
 AbsoluteJS discovers these named application imports at mobile initialization

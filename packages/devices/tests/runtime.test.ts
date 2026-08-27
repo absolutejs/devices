@@ -8,6 +8,7 @@ import {
   clipboard,
   documents,
   haptics,
+  keyboard,
   lifecycle,
   links,
   location,
@@ -18,6 +19,7 @@ import {
   secureStorage,
   share,
   storage,
+  systemBars,
 } from "../src";
 import { installDeviceAdapter } from "../src/runtime";
 import { createTestDeviceAdapter } from "../src/testing";
@@ -90,6 +92,28 @@ describe("@absolutejs/devices runtime", () => {
       "impact:light",
       "notification:warning",
       "selection",
+    ]);
+  });
+
+  test("normalizes keyboard state and modern system-bar controls", async () => {
+    const testDevice = createTestDeviceAdapter();
+    cleanup = installDeviceAdapter(testDevice.adapter);
+    const states: string[] = [];
+    const remove = await keyboard.onChange((state) =>
+      states.push(`${state.visible}:${state.heightPx}`),
+    );
+
+    testDevice.emitKeyboard({ heightPx: 312, visible: true });
+    expect(await keyboard.getState()).toEqual({ heightPx: 312, visible: true });
+    await keyboard.dismiss();
+    expect(states).toEqual(["true:312", "false:0"]);
+    await remove();
+
+    await systemBars.setAppearance("light", "status");
+    await systemBars.setVisible(false, "navigation");
+    expect(testDevice.systemBarEvents).toEqual([
+      "appearance:status:light",
+      "visible:navigation:false",
     ]);
   });
 

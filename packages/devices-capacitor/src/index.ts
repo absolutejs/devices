@@ -18,6 +18,7 @@ import {
   type DeviceDocumentsCapability,
   type DeviceCameraCapability,
   type DeviceHapticsCapability,
+  type DeviceKeyboardCapability,
   type DeviceLocationCapability,
   type DeviceLocalNotificationsCapability,
   type DevicePushNotificationsCapability,
@@ -29,6 +30,7 @@ import {
   type DeviceSecureStorageCapability,
   type DeviceShareCapability,
   type DeviceSubscription,
+  type DeviceSystemBarsCapability,
 } from "@absolutejs/devices";
 import { createCapacitorSecureStorage } from "./secureStorage";
 
@@ -58,6 +60,7 @@ export type CapacitorDeviceAdapterOptions = {
   clipboard?: DeviceClipboardCapability;
   documents?: DeviceDocumentsCapability;
   haptics?: DeviceHapticsCapability;
+  keyboard?: DeviceKeyboardCapability;
   location?: DeviceLocationCapability;
   localNotifications?: DeviceLocalNotificationsCapability;
   pushNotifications?: DevicePushNotificationsCapability;
@@ -65,6 +68,7 @@ export type CapacitorDeviceAdapterOptions = {
   secureStorage?: DeviceSecureStorageCapability;
   share?: DeviceShareCapability;
   storagePrefix?: string;
+  systemBars?: DeviceSystemBarsCapability;
 };
 
 const defaultBindings = (): CapacitorDeviceBindings => ({
@@ -266,6 +270,7 @@ export const createCapacitorDeviceAdapter = (
       : { pushNotifications: options.pushNotifications }),
     ...(options.camera === undefined ? {} : { camera: options.camera }),
     ...(options.haptics === undefined ? {} : { haptics: options.haptics }),
+    ...(options.keyboard === undefined ? {} : { keyboard: options.keyboard }),
     platform: {
       getInfo: async () => {
         const info = await callProvider(
@@ -417,6 +422,9 @@ export const createCapacitorDeviceAdapter = (
           bindings.preferences.set({ key: storageKey(key), value }),
         ),
     },
+    ...(options.systemBars === undefined
+      ? {}
+      : { systemBars: options.systemBars }),
   };
 };
 
