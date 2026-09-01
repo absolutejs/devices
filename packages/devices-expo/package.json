@@ -1,0 +1,114 @@
+{
+  "name": "@absolutejs/devices-expo",
+  "version": "0.0.1",
+  "description": "Expo runtime adapter for @absolutejs/devices",
+  "type": "module",
+  "license": "BSL-1.1",
+  "author": "Alex Kahn",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/absolutejs/devices.git",
+    "directory": "packages/devices-expo"
+  },
+  "homepage": "https://github.com/absolutejs/devices",
+  "bugs": {
+    "url": "https://github.com/absolutejs/devices/issues"
+  },
+  "files": ["dist", "README.md"],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./bridge": { "types": "./dist/bridge.d.ts", "import": "./dist/bridge.js" },
+    "./camera": { "types": "./dist/camera.d.ts", "import": "./dist/camera.js" },
+    "./clipboard": { "types": "./dist/clipboard.d.ts", "import": "./dist/clipboard.js" },
+    "./documents": { "types": "./dist/documents.d.ts", "import": "./dist/documents.js" },
+    "./haptics": { "types": "./dist/haptics.d.ts", "import": "./dist/haptics.js" },
+    "./keyboard": { "types": "./dist/keyboard.d.ts", "import": "./dist/keyboard.js" },
+    "./local-notifications": { "types": "./dist/localNotifications.d.ts", "import": "./dist/localNotifications.js" },
+    "./location": { "types": "./dist/location.d.ts", "import": "./dist/location.js" },
+    "./push-notifications": { "types": "./dist/pushNotifications.d.ts", "import": "./dist/pushNotifications.js" },
+    "./share": { "types": "./dist/share.d.ts", "import": "./dist/share.js" },
+    "./system-bars": { "types": "./dist/systemBars.d.ts", "import": "./dist/systemBars.js" },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "build": "bun build src/index.ts src/bridge.ts src/camera.ts src/clipboard.ts src/documents.ts src/haptics.ts src/keyboard.ts src/localNotifications.ts src/location.ts src/pushNotifications.ts src/share.ts src/systemBars.ts --root src --outdir dist --target=browser --external @absolutejs/devices --external @react-native-async-storage/async-storage --external expo-application --external expo-clipboard --external expo-device --external expo-document-picker --external expo-file-system --external expo-haptics --external expo-image-manipulator --external expo-image-picker --external expo-linking --external expo-localization --external expo-location --external expo-navigation-bar --external expo-network --external expo-notifications --external expo-sharing --external expo-status-bar --external react-native && tsc --emitDeclarationOnly -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo-application": "~57.0.2",
+    "expo-device": "~57.0.1",
+    "expo-linking": "~57.0.8",
+    "expo-localization": "~57.0.1",
+    "expo-network": "~57.0.1"
+  },
+  "peerDependencies": {
+    "@absolutejs/devices": "^0.7.0",
+    "expo": ">=57 <58",
+    "expo-clipboard": ">=57 <58",
+    "expo-document-picker": ">=57 <58",
+    "expo-file-system": ">=57 <58",
+    "expo-haptics": ">=57 <58",
+    "expo-image-manipulator": ">=57 <58",
+    "expo-image-picker": ">=57 <58",
+    "expo-location": ">=57 <58",
+    "expo-navigation-bar": ">=57 <58",
+    "expo-notifications": ">=57 <58",
+    "expo-sharing": ">=57 <58",
+    "expo-status-bar": ">=57 <58",
+    "react-native": ">=0.86 <0.87"
+  },
+  "peerDependenciesMeta": {
+    "expo-clipboard": { "optional": true },
+    "expo-document-picker": { "optional": true },
+    "expo-file-system": { "optional": true },
+    "expo-haptics": { "optional": true },
+    "expo-image-manipulator": { "optional": true },
+    "expo-image-picker": { "optional": true },
+    "expo-location": { "optional": true },
+    "expo-navigation-bar": { "optional": true },
+    "expo-notifications": { "optional": true },
+    "expo-sharing": { "optional": true },
+    "expo-status-bar": { "optional": true }
+  },
+  "devDependencies": {
+    "@absolutejs/devices": "workspace:*",
+    "expo": "~57.0.9",
+    "expo-clipboard": "~57.0.1",
+    "expo-document-picker": "~57.0.1",
+    "expo-file-system": "~57.0.6",
+    "expo-haptics": "~57.0.2",
+    "expo-image-manipulator": "~57.0.14",
+    "expo-image-picker": "~57.0.14",
+    "expo-location": "~57.0.14",
+    "expo-navigation-bar": "~57.0.2",
+    "expo-notifications": "~57.0.15",
+    "expo-sharing": "~57.0.16",
+    "expo-status-bar": "~57.0.1",
+    "react-native": "0.86.3"
+  },
+  "absolutejs": {
+    "devices": {
+      "format": 1,
+      "provider": "expo",
+      "capabilities": {
+        "camera": { "factory": "createExpoCameraCapability", "module": "@absolutejs/devices-expo/camera", "packages": ["expo-image-manipulator@57.0.14", "expo-image-picker@57.0.14"], "plugins": ["expo-image-picker"], "native": { "ios": { "usageDescriptions": ["camera"] } } },
+        "clipboard": { "factory": "createExpoClipboardCapability", "module": "@absolutejs/devices-expo/clipboard", "packages": ["expo-clipboard@57.0.1"], "plugins": [] },
+        "documents": { "factory": "createExpoDocumentsCapability", "module": "@absolutejs/devices-expo/documents", "packages": ["expo-document-picker@57.0.1", "expo-file-system@57.0.6", "expo-sharing@57.0.16"], "plugins": ["expo-document-picker"], "native": { "ios": { "privacyAccessedApis": { "NSPrivacyAccessedAPICategoryFileTimestamp": ["C617.1"] } } } },
+        "haptics": { "factory": "createExpoHapticsCapability", "module": "@absolutejs/devices-expo/haptics", "packages": ["expo-haptics@57.0.2"], "plugins": [] },
+        "keyboard": { "factory": "createExpoKeyboardCapability", "module": "@absolutejs/devices-expo/keyboard", "packages": [], "plugins": [] },
+        "location": { "factory": "createExpoLocationCapability", "module": "@absolutejs/devices-expo/location", "packages": ["expo-location@57.0.14"], "plugins": ["expo-location"], "native": { "android": { "permissions": ["android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"] }, "ios": { "usageDescriptions": ["location-when-in-use"] } } },
+        "localNotifications": { "factory": "createExpoLocalNotificationsCapability", "module": "@absolutejs/devices-expo/local-notifications", "packages": ["expo-notifications@57.0.15"], "plugins": ["expo-notifications"], "native": { "android": { "permissions": ["android.permission.POST_NOTIFICATIONS"] } } },
+        "photos": { "factory": "createExpoPhotosCapability", "module": "@absolutejs/devices-expo/camera", "packages": ["expo-image-manipulator@57.0.14", "expo-image-picker@57.0.14"], "plugins": ["expo-image-picker"], "native": { "ios": { "usageDescriptions": ["photo-library"] } } },
+        "pushNotifications": { "factory": "createExpoPushNotificationsCapability", "module": "@absolutejs/devices-expo/push-notifications", "packages": ["expo-notifications@57.0.15"], "plugins": ["expo-notifications"], "native": { "android": { "permissions": ["android.permission.POST_NOTIFICATIONS"] }, "ios": { "pushNotifications": true } } },
+        "share": { "factory": "createExpoShareCapability", "module": "@absolutejs/devices-expo/share", "packages": [], "plugins": [] },
+        "systemBars": { "factory": "createExpoSystemBarsCapability", "module": "@absolutejs/devices-expo/system-bars", "packages": ["expo-navigation-bar@57.0.2", "expo-status-bar@57.0.1"], "plugins": [], "native": { "ios": { "systemBars": true } } }
+      }
+    }
+  }
+}

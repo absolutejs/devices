@@ -52,6 +52,21 @@ for (const [specifier, exportedName] of entries) {
     throw new Error(`${specifier} does not export ${exportedName}.`);
 }
 
+// Expo/React Native is not importable in Bun's server runtime. Verify its
+// production entrypoints structurally; the provider tests exercise the source.
+for (const [path, exportedName] of [
+  ["../packages/devices-expo/dist/index.js", "createExpoDeviceAdapter"],
+  ["../packages/devices-expo/dist/bridge.js", "createExpoDevicesBridgeHost"],
+  ["../packages/devices-expo/dist/camera.js", "createExpoCameraCapability"],
+  ["../packages/devices-expo/dist/documents.js", "createExpoDocumentsCapability"],
+  ["../packages/devices-expo/dist/location.js", "createExpoLocationCapability"],
+  ["../packages/devices-expo/dist/pushNotifications.js", "createExpoPushNotificationsCapability"],
+] as const) {
+  const source = await Bun.file(new URL(path, import.meta.url)).text();
+  if (!source.includes(exportedName))
+    throw new Error(`${path} does not export ${exportedName}.`);
+}
+
 const baseAdapter = await Bun.file(
   new URL("../packages/devices-capacitor/dist/index.js", import.meta.url),
 ).text();
