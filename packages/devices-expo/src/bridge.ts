@@ -10,6 +10,9 @@ import {
 
 const CHUNK_BYTES = 24 * 1024;
 const MAX_TRANSFER_BYTES = 64 * 1024 * 1024;
+const MAX_ACTIVE_TRANSFERS = 4;
+const MAX_ACTIVE_UPLOADS = 2;
+const TRANSFER_TTL_MS = 5 * 60_000;
 
 export type ExpoDevicesBridgeEvent = (
   event: string,
@@ -26,7 +29,8 @@ export type ExpoDevicesBridgeTransport = {
 
 type Transfer = { blob: Blob; expiresAt: number };
 type Upload = {
-  chunks: Uint8Array[];
+	chunks: Uint8Array[];
+	expiresAt: number;
   mimeType: string;
   name: string;
   received: number;
@@ -131,9 +135,13 @@ export const createExpoDevicesBridgeHost = async (
   const uploads = new Map<string, Upload>();
   const watches = new Map<string, DeviceSubscription>();
   const listeners: DeviceSubscription[] = [];
-  const addTransfer = (blob: Blob) => {
-    const id = crypto.randomUUID();
-    transfers.set(id, { blob, expiresAt: Date.now() + 60_000 });
+	const addTransfer = (blob: Blob) => {
+		for (const [id, transfer] of transfers)
+			if (transfer.expiresAt < Date.now()) transfers.delete(id);
+		if (transfers.size >= MAX_ACTIVE_TRANSFERS)
+			throw new DeviceError("unavailable", "Too many active device transfers.");
+		const id = crypto.randomUUID();
+		transfers.set(id, { blob, expiresAt: Date.now() + TRANSFER_TTL_MS });
     return id;
   };
   const emitSafe = (event: string, payload: unknown) =>
@@ -398,14 +406,15 @@ export const createExpoDevicesBridgeHost = async (
             transferId: addTransfer(value.blob),
           })),
         );
-      case "devices.transfer.read": {
+		case "devices.transfer.read": {
         const id = text(params.id, "id");
         const transfer = transfers.get(id);
         if (!transfer || transfer.expiresAt < Date.now()) {
           transfers.delete(id);
           throw new DeviceError("unavailable", "Device transfer expired.");
         }
-        const offset = integer(params.offset, "offset", transfer.blob.size);
+			const offset = integer(params.offset, "offset", transfer.blob.size);
+			transfer.expiresAt = Date.now() + TRANSFER_TTL_MS;
         const length = integer(params.length, "length", CHUNK_BYTES);
         const bytes = new Uint8Array(
           await transfer.blob.slice(offset, offset + length).arrayBuffer(),
@@ -420,11 +429,16 @@ export const createExpoDevicesBridgeHost = async (
       case "devices.transfer.close":
         transfers.delete(text(params.id, "id"));
         return null;
-      case "devices.upload.begin": {
-        const size = integer(params.size, "size", MAX_TRANSFER_BYTES);
+		case "devices.upload.begin": {
+			for (const [uploadId, upload] of uploads)
+				if (upload.expiresAt < Date.now()) uploads.delete(uploadId);
+			if (uploads.size >= MAX_ACTIVE_UPLOADS)
+				throw new DeviceError("unavailable", "Too many active device uploads.");
+			const size = integer(params.size, "size", MAX_TRANSFER_BYTES);
         const id = crypto.randomUUID();
         uploads.set(id, {
-          chunks: [],
+				chunks: [],
+				expiresAt: Date.now() + TRANSFER_TTL_MS,
           mimeType:
             typeof params.mimeType === "string" ? params.mimeType : "application/octet-stream",
           name: text(params.name, "name"),
@@ -436,12 +450,16 @@ export const createExpoDevicesBridgeHost = async (
       case "devices.upload.write": {
         const id = text(params.id, "id");
         const upload = uploads.get(id);
-        if (!upload) throw new DeviceError("unavailable", "Device upload expired.");
+			if (!upload || upload.expiresAt < Date.now()) {
+				uploads.delete(id);
+				throw new DeviceError("unavailable", "Device upload expired.");
+			}
         const bytes = base64ToBytes(text(params.data, "data"));
         if (bytes.byteLength > CHUNK_BYTES || upload.received + bytes.byteLength > upload.size)
           throw new TypeError("Device upload chunk is invalid.");
-        upload.chunks.push(bytes);
-        upload.received += bytes.byteLength;
+			upload.chunks.push(bytes);
+			upload.received += bytes.byteLength;
+			upload.expiresAt = Date.now() + TRANSFER_TTL_MS;
         return { received: upload.received };
       }
       case "devices.documents.export":

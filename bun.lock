@@ -65,7 +65,7 @@
     },
     "packages/devices-expo": {
       "name": "@absolutejs/devices-expo",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@react-native-async-storage/async-storage": "2.2.0",
         "expo-application": "~57.0.2",

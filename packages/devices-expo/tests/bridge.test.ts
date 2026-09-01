@@ -90,6 +90,11 @@ describe("Expo devices WebView bridge", () => {
     await expect(host.request("devices.arbitrary.execute", {})).rejects.toMatchObject({
       code: "unsupported",
     });
+    await host.request("devices.upload.begin", { name: "one.txt", size: 0 });
+    await host.request("devices.upload.begin", { name: "two.txt", size: 0 });
+    await expect(
+      host.request("devices.upload.begin", { name: "three.txt", size: 0 }),
+    ).rejects.toMatchObject({ code: "unavailable" });
     await host.close();
   });
 });
