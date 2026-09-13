@@ -34,6 +34,14 @@ const harness = async () => {
 };
 
 describe("Expo devices WebView bridge", () => {
+  test("tolerates a native listener that has no disposer", async () => {
+    const controller = createTestDeviceAdapter();
+    controller.adapter.lifecycle.onResume = async () => undefined as never;
+    const host = await createExpoDevicesBridgeHost(controller.adapter, () => {});
+
+    await expect(host.close()).resolves.toBeUndefined();
+  });
+
   test("provides the same storage, clipboard, lifecycle, and location contracts", async () => {
     const { adapter, controller, host } = await harness();
     await adapter.storage.set("theme", "dark");

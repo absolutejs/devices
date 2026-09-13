@@ -152,7 +152,12 @@ export const createExpoDevicesBridgeHost = async (
   const listen = async (
     operation: (() => Promise<DeviceSubscription>) | undefined,
   ) => {
-    if (operation) listeners.push(await operation());
+    if (!operation) return;
+    const stop = await operation();
+    // Native event APIs have changed subscription return shapes across Expo
+    // and React Native releases. Treat a missing disposer as already-cleaned
+    // instead of allowing a Fast Refresh unmount to reject bridge shutdown.
+    if (typeof stop === "function") listeners.push(stop);
   };
 
   await Promise.all([
