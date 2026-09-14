@@ -1,0 +1,134 @@
+import { describe, expect, mock, test } from "bun:test";
+
+mock.module("expo-image-picker", () => ({
+  CameraType: { back: "back", front: "front" },
+}));
+mock.module("expo-image-manipulator", () => ({
+  SaveFormat: { JPEG: "jpeg" },
+  manipulateAsync: async () => {
+    throw new Error("unexpected transform");
+  },
+}));
+
+const { createExpoPhotosCapability } = await import("../src/camera");
+const { createExpoRestoredOperationLifecycle, takeExpoRestoredOperation } =
+  await import("../src/restoration");
+
+const bindings = (pending: unknown) => ({
+  getCameraPermissionsAsync: async () => ({
+    canAskAgain: true,
+    granted: false,
+    status: "undetermined" as const,
+  }),
+  getMediaLibraryPermissionsAsync: async () => ({
+    accessPrivileges: "none" as const,
+    canAskAgain: true,
+    granted: false,
+    status: "undetermined" as const,
+  }),
+  getPendingResultAsync: mock(async () => pending),
+  launchCameraAsync: async () => ({ assets: null, canceled: true as const }),
+  launchImageLibraryAsync: async () => ({ assets: null, canceled: true as const }),
+  manipulateAsync: async () => {
+    throw new Error("unexpected transform");
+  },
+  requestCameraPermissionsAsync: async () => ({
+    canAskAgain: false,
+    granted: true,
+    status: "granted" as const,
+  }),
+});
+
+describe("Expo photo restoration", () => {
+  test("normalizes a pending Android picker result and consumes it once", async () => {
+    const provider = bindings({
+      assets: [
+        {
+          fileName: "picked.jpg",
+          fileSize: 12,
+          height: 3,
+          mimeType: "image/jpeg",
+          uri: "file:///cache/picked.jpg",
+          width: 4,
+        },
+      ],
+      canceled: false,
+    });
+    const photos = createExpoPhotosCapability(provider as never);
+
+    const first = await takeExpoRestoredOperation(photos);
+    const second = await takeExpoRestoredOperation(photos);
+    expect(first).toEqual({
+      data: [
+        {
+          format: "image/jpeg",
+          height: 3,
+          name: "picked.jpg",
+          sizeBytes: 12,
+          uri: "file:///cache/picked.jpg",
+          webPath: "file:///cache/picked.jpg",
+          width: 4,
+        },
+      ],
+      method: "pick",
+      plugin: "expo-image-picker",
+      success: true,
+    });
+    expect(second).toBe(first);
+    expect(provider.getPendingResultAsync).toHaveBeenCalledTimes(1);
+  });
+
+  test("turns a pending native picker error into a public failed operation", async () => {
+    const photos = createExpoPhotosCapability(
+      bindings({ code: "E_PICKER", message: "Picker failed" }) as never,
+    );
+    expect(await takeExpoRestoredOperation(photos)).toEqual({
+      error: { code: "E_PICKER", message: "Picker failed" },
+      method: "pick",
+      plugin: "expo-image-picker",
+      success: false,
+    });
+  });
+
+  test("replays one restored operation to late listeners and honors cleanup", async () => {
+    const photos = createExpoPhotosCapability(
+      bindings({
+        assets: [{ height: 1, uri: "file:///cache/restored.jpg", width: 1 }],
+        canceled: false,
+      }) as never,
+    );
+    const lifecycle = createExpoRestoredOperationLifecycle(photos, true);
+    const early: unknown[] = [];
+    const stopEarly = await lifecycle.onRestoredOperation((value) =>
+      early.push(value),
+    );
+    await Bun.sleep(0);
+    expect(early).toHaveLength(1);
+    await stopEarly();
+
+    const late: unknown[] = [];
+    const stopLate = await lifecycle.onRestoredOperation((value) => late.push(value));
+    await Bun.sleep(0);
+    expect(late).toHaveLength(1);
+    await stopLate();
+
+    let resolvePending: ((value: unknown) => void) | undefined;
+    const pending = new Promise((resolve) => {
+      resolvePending = resolve;
+    });
+    const delayedBindings = bindings(null);
+    delayedBindings.getPendingResultAsync = mock(async () => pending) as never;
+    const delayedLifecycle = createExpoRestoredOperationLifecycle(
+      createExpoPhotosCapability(delayedBindings as never),
+      true,
+    );
+    const removed: unknown[] = [];
+    const stopRemoved = await delayedLifecycle.onRestoredOperation((value) =>
+      removed.push(value),
+    );
+    await stopRemoved();
+    resolvePending?.({ assets: [], canceled: true });
+    await Bun.sleep(0);
+    expect(removed).toHaveLength(0);
+  });
+});

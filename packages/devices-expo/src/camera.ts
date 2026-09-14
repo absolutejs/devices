@@ -8,19 +8,28 @@ import {
   type DevicePhoto,
   type DevicePhotosCapability,
   type DevicePhotoTransform,
+  type DeviceRestoredOperation,
 } from "@absolutejs/devices";
 import { expoFailure, expoPermissionStatus } from "./common";
+import {
+  EXPO_RESTORED_OPERATION_SOURCE,
+  type ExpoRestoredOperationSource,
+} from "./restoration";
 
 export type ExpoCameraBindings = Pick<
   typeof ImagePicker,
   | "getCameraPermissionsAsync"
   | "getMediaLibraryPermissionsAsync"
+  | "getPendingResultAsync"
   | "launchCameraAsync"
   | "launchImageLibraryAsync"
   | "requestCameraPermissionsAsync"
 > & {
   manipulateAsync: typeof ImageManipulator.manipulateAsync;
 };
+
+export type ExpoPhotosCapability = DevicePhotosCapability &
+  ExpoRestoredOperationSource;
 
 const defaultBindings = (): ExpoCameraBindings => ({
   ...ImagePicker,
@@ -126,9 +135,64 @@ export const createExpoCameraCapability = (
 
 export const createExpoPhotosCapability = (
   bindings: ExpoCameraBindings = defaultBindings(),
-): DevicePhotosCapability => ({
-  capability: async () => availableCapability("native"),
-  pick: async (options) => {
+): ExpoPhotosCapability => {
+  let pendingRead: Promise<DeviceRestoredOperation | null> | undefined;
+  const takeRestoredOperation = () =>
+    (pendingRead ??= (async (): Promise<DeviceRestoredOperation | null> => {
+      try {
+        const result = await bindings.getPendingResultAsync();
+        if (result === null) return null;
+        if ("code" in result)
+          return {
+            error: { code: result.code, message: result.message },
+            method: "pick",
+            plugin: "expo-image-picker",
+            success: false,
+          };
+        if (result.canceled)
+          return {
+            error: { code: "cancelled", message: "Photo selection was cancelled." },
+            method: "pick",
+            plugin: "expo-image-picker",
+            success: false,
+          };
+        const assets = result.assets ?? [];
+        if (assets.length === 0)
+          return {
+            error: {
+              code: "failed",
+              message: "The restored native picker returned no photos.",
+            },
+            method: "pick",
+            plugin: "expo-image-picker",
+            success: false,
+          };
+        return {
+          data: await Promise.all(
+            assets.slice(0, 100).map((asset) => photo(asset, undefined, bindings)),
+          ),
+          method: "pick",
+          plugin: "expo-image-picker",
+          success: true,
+        };
+      } catch (error) {
+        const normalized = expoFailure(
+          error,
+          "Failed to restore native photo selection.",
+        );
+        return {
+          error: { code: normalized.code, message: normalized.message },
+          method: "pick",
+          plugin: "expo-image-picker",
+          success: false,
+        };
+      }
+    })());
+
+  return {
+    [EXPO_RESTORED_OPERATION_SOURCE]: takeRestoredOperation,
+    capability: async () => availableCapability("native"),
+    pick: async (options) => {
     validateTransform(options?.transform);
     const limit = options?.limit ?? 1;
     if (!Number.isInteger(limit) || limit < 1 || limit > 100)
@@ -150,5 +214,6 @@ export const createExpoPhotosCapability = (
     } catch (error) {
       throw expoFailure(error, "Failed to pick native photos.");
     }
-  },
-});
+    },
+  };
+};

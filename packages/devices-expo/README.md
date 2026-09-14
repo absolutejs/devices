@@ -7,3 +7,12 @@ Application code continues to import capabilities from `@absolutejs/devices`.
 The root entry installs platform, lifecycle, links, Android Back, network, and
 namespaced ordinary storage. Optional capabilities are exposed through isolated
 subpaths so unused permissions and native modules are not added to an app.
+
+On Android, the photo provider consumes Expo Image Picker's pending result when
+the system recreates the host activity. The normalized result is replayed once
+per subscriber through `lifecycle.onRestoredOperation`; embedded routes receive
+photo bytes through the same bounded transfer bridge as an ordinary pick. Native
+paths and Expo result objects are not exposed across that bridge. This recovery
+requires no application-owned Android code. A restored operation uses
+`plugin: "expo-image-picker"`, `method: "pick"`, and carries either normalized
+`DevicePhoto[]` data or a public error.

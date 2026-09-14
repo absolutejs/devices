@@ -5,6 +5,7 @@ import {
   type DeviceDocument,
   type DeviceLocationEvent,
   type DevicePhoto,
+  type DeviceRestoredOperation,
   type DeviceSubscription,
 } from "@absolutejs/devices";
 
@@ -135,6 +136,11 @@ export const createExpoDevicesBridgeHost = async (
   const uploads = new Map<string, Upload>();
   const watches = new Map<string, DeviceSubscription>();
   const listeners: DeviceSubscription[] = [];
+	const restoredOperations: Array<{
+		id: string;
+		operation: Record<string, unknown>;
+	}> = [];
+	let active = true;
 	const addTransfer = (blob: Blob) => {
 		for (const [id, transfer] of transfers)
 			if (transfer.expiresAt < Date.now()) transfers.delete(id);
@@ -159,6 +165,38 @@ export const createExpoDevicesBridgeHost = async (
     // instead of allowing a Fast Refresh unmount to reject bridge shutdown.
     if (typeof stop === "function") listeners.push(stop);
   };
+	const queueRestoredOperation = async (operation: DeviceRestoredOperation) => {
+		let data = operation.data;
+		if (
+			operation.success &&
+			operation.plugin === "expo-image-picker" &&
+			operation.method === "pick" &&
+			Array.isArray(data)
+		) {
+			data = await Promise.all(
+				(data as DevicePhoto[]).slice(0, 100).map((value) =>
+					photoDescriptor(value, addTransfer),
+				),
+			);
+		}
+		if (!active) return;
+		const queued = {
+			id: crypto.randomUUID(),
+			operation: record(
+				publicValue({
+					...(data === undefined ? {} : { data }),
+					...(operation.error === undefined ? {} : { error: operation.error }),
+					method: operation.method,
+					plugin: operation.plugin,
+					success: operation.success,
+				}),
+				"Restored device operation must be an object.",
+			),
+		};
+		restoredOperations.push(queued);
+		if (restoredOperations.length > 8) restoredOperations.shift();
+		emit("devices.lifecycle.restoredOperation", queued);
+	};
 
   await Promise.all([
     listen(() =>
@@ -174,6 +212,14 @@ export const createExpoDevicesBridgeHost = async (
             )
         : undefined,
     ),
+		listen(
+			adapter.lifecycle.onRestoredOperation
+				? () =>
+						adapter.lifecycle.onRestoredOperation!((operation) => {
+							void queueRestoredOperation(operation);
+						})
+				: undefined,
+		),
     listen(() =>
       adapter.links.onOpen((url) => emit("devices.links.open", { url })),
     ),
@@ -239,6 +285,8 @@ export const createExpoDevicesBridgeHost = async (
         return adapter.platform.getInfo();
       case "devices.lifecycle.getState":
         return adapter.lifecycle.getState();
+		case "devices.lifecycle.takeRestoredOperations":
+			return restoredOperations.splice(0);
       case "devices.links.getLaunchUrl":
         return adapter.links.getLaunchUrl();
       case "devices.links.openExternal":
@@ -495,6 +543,7 @@ export const createExpoDevicesBridgeHost = async (
 
   return {
     close: async () => {
+		active = false;
       await Promise.allSettled([
         ...listeners.map((stop) => stop()),
         ...watches.values().map((stop) => stop()),
@@ -598,6 +647,50 @@ const bridgedPhoto = async (
   };
 };
 
+const bridgedRestoredOperation = async (
+  transport: ExpoDevicesBridgeTransport,
+  value: unknown,
+): Promise<DeviceRestoredOperation> => {
+  const operation = record(value, "Restored device operation is invalid.");
+  const success = operation.success === true;
+  const plugin = text(operation.plugin, "plugin");
+  const method = text(operation.method, "method");
+  let data = operation.data;
+  if (
+    success &&
+    plugin === "expo-image-picker" &&
+    method === "pick" &&
+    Array.isArray(data)
+  ) {
+    data = await Promise.all(
+      data.slice(0, 100).map((entry) =>
+        bridgedPhoto(
+          transport,
+          record(entry, "Restored photo descriptor is invalid."),
+        ),
+      ),
+    );
+  }
+  const error = operation.error;
+  return {
+    ...(data === undefined ? {} : { data }),
+    ...(error === undefined
+      ? {}
+      : {
+          error: (() => {
+            const value = record(error, "Restored device error is invalid.");
+            return {
+              ...(typeof value.code === "string" ? { code: value.code } : {}),
+              message: text(value.message, "error.message"),
+            };
+          })(),
+        }),
+    method,
+    plugin,
+    success,
+  };
+};
+
 export const createExpoWebViewDeviceAdapter = (
   transport: ExpoDevicesBridgeTransport,
   capabilities: readonly string[],
@@ -619,6 +712,29 @@ export const createExpoWebViewDeviceAdapter = (
           "devices.lifecycle.change",
           ({ state }) => listener(state),
         ),
+		onRestoredOperation: async (listener) => {
+			const seen = new Set<string>();
+			let active = true;
+			const deliver = async (payload: Record<string, unknown>) => {
+				if (!active) return;
+				const id = text(payload.id, "id");
+				if (seen.has(id)) return;
+				seen.add(id);
+				listener(await bridgedRestoredOperation(transport, payload.operation));
+			};
+			const stop = transport.on("devices.lifecycle.restoredOperation", (payload) => {
+				void deliver(payload);
+			});
+			const queued = await remote<Array<Record<string, unknown>>>(
+				transport,
+				"devices.lifecycle.takeRestoredOperations",
+			);
+			await Promise.all(queued.map(deliver));
+			return async () => {
+				active = false;
+				await stop();
+			};
+		},
       onResume: (listener) => on("devices.lifecycle.resume", listener),
     },
     links: {

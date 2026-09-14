@@ -26,7 +26,7 @@ const harness = async () => {
   };
   return {
     adapter: createExpoWebViewDeviceAdapter(transport, [
-      "clipboard", "documents", "haptics", "keyboard", "location",
+      "clipboard", "documents", "haptics", "keyboard", "location", "photos",
     ]),
     controller,
     host,
@@ -76,6 +76,42 @@ describe("Expo devices WebView bridge", () => {
     expect(await (exported.content as Blob).text()).toBe(content);
     const [picked] = await adapter.documents!.pick();
     expect(await picked!.blob.text()).toBe("test document");
+    await host.close();
+  });
+
+  test("replays a restored Android photo picker result once through bounded transfers", async () => {
+    const { adapter, controller, host } = await harness();
+    controller.emitRestoredOperation({
+      data: [
+        {
+          ...controller.pickedPhotos[0],
+          webPath: "data:text/plain,test%20photo",
+        },
+      ],
+      method: "pick",
+      native: { secret: "must-not-cross" },
+      plugin: "expo-image-picker",
+      success: true,
+    });
+    await Bun.sleep(0);
+
+    const restored: unknown[] = [];
+    const stop = await adapter.lifecycle.onRestoredOperation!((operation) =>
+      restored.push(operation),
+    );
+    expect(restored).toHaveLength(1);
+    expect(restored[0]).toMatchObject({
+      method: "pick",
+      plugin: "expo-image-picker",
+      success: true,
+    });
+    expect(restored[0]).not.toHaveProperty("native");
+    const [picked] = (restored[0] as { data: Array<{ webPath: string }> }).data;
+    expect(await (await fetch(picked!.webPath)).text()).toBe("test photo");
+
+    await Bun.sleep(0);
+    expect(restored).toHaveLength(1);
+    await stop();
     await host.close();
   });
 

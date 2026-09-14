@@ -31,6 +31,7 @@ import {
   type DeviceSystemBarsCapability,
 } from "@absolutejs/devices";
 import { removable, safeExternalUrl } from "./common";
+import { createExpoRestoredOperationLifecycle } from "./restoration";
 
 const DEFAULT_STORAGE_PREFIX = "absolutejs.devices.";
 
@@ -97,6 +98,10 @@ export const createExpoDeviceAdapter = (
     options.storagePrefix ?? DEFAULT_STORAGE_PREFIX,
   );
   const key = (value: string) => `${prefix}${value}`;
+  const restoredLifecycle = createExpoRestoredOperationLifecycle(
+    options.photos,
+    Platform.OS === "android",
+  );
   return {
     runtime: "expo",
     back: {
@@ -132,6 +137,7 @@ export const createExpoDeviceAdapter = (
         );
         return removable(() => subscription.remove());
       },
+      onRestoredOperation: restoredLifecycle.onRestoredOperation,
       onResume: async (listener) => {
         let previous = lifecycleState(AppState.currentState);
         const subscription = AppState.addEventListener("change", (next) => {
