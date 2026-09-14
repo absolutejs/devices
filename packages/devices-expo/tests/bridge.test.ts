@@ -115,6 +115,38 @@ describe("Expo devices WebView bridge", () => {
     await host.close();
   });
 
+  test("bridges a restored camera result without exposing its native path", async () => {
+    const { adapter, controller, host } = await harness();
+    const restored: unknown[] = [];
+    const stop = await adapter.lifecycle.onRestoredOperation!((operation) =>
+      restored.push(operation),
+    );
+    controller.emitRestoredOperation({
+      data: {
+        ...controller.pickedPhotos[0],
+        uri: "file:///private/camera.jpg",
+        webPath: "data:text/plain,camera%20photo",
+      },
+      method: "takePhoto",
+      plugin: "expo-image-picker",
+      success: true,
+    });
+    await Bun.sleep(0);
+
+    expect(restored).toHaveLength(1);
+    expect(restored[0]).toMatchObject({
+      method: "takePhoto",
+      plugin: "expo-image-picker",
+      success: true,
+    });
+    const photo = (restored[0] as { data: { uri: string; webPath: string } }).data;
+    expect(photo.uri).toStartWith("blob:");
+    expect(photo.uri).not.toContain("/private/");
+    expect(await (await fetch(photo.webPath)).text()).toBe("camera photo");
+    await stop();
+    await host.close();
+  });
+
   test("strips native-only values and rejects methods outside the allowlist", async () => {
     const controller = createTestDeviceAdapter();
     controller.adapter.platform.getInfo = async () => ({

@@ -178,6 +178,14 @@ export const createExpoDevicesBridgeHost = async (
 					photoDescriptor(value, addTransfer),
 				),
 			);
+		} else if (
+			operation.success &&
+			operation.plugin === "expo-image-picker" &&
+			operation.method === "takePhoto" &&
+			typeof data === "object" &&
+			data !== null
+		) {
+			data = await photoDescriptor(data as DevicePhoto, addTransfer);
 		}
 		if (!active) return;
 		const queued = {
@@ -670,6 +678,17 @@ const bridgedRestoredOperation = async (
         ),
       ),
     );
+	} else if (
+		success &&
+		plugin === "expo-image-picker" &&
+		method === "takePhoto" &&
+		typeof data === "object" &&
+		data !== null
+	) {
+		data = await bridgedPhoto(
+			transport,
+			record(data, "Restored photo descriptor is invalid."),
+		);
   }
   const error = operation.error;
   return {
