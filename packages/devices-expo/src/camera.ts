@@ -1,5 +1,6 @@
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   DeviceError,
   availableCapability,
@@ -100,9 +101,29 @@ type PendingPhotoOperation = {
   transform?: DevicePhotoTransform;
 };
 
+const PENDING_PHOTO_OPERATION_KEY =
+  "@absolutejs/devices-expo/pending-photo-operation";
+
+const storedOperation = async (): Promise<PendingPhotoOperation | undefined> => {
+  const value = await AsyncStorage.getItem(PENDING_PHOTO_OPERATION_KEY);
+  if (value === null) return;
+  try {
+    const parsed = JSON.parse(value) as Partial<PendingPhotoOperation>;
+    if (
+      (parsed.kind !== "pick" && parsed.kind !== "takePhoto") ||
+      !Number.isInteger(parsed.limit) ||
+      (parsed.limit ?? 0) < 1
+    )
+      return;
+    return parsed as PendingPhotoOperation;
+  } catch {
+    return;
+  }
+};
+
 const restorations = new WeakMap<object, {
-  begin(operation: PendingPhotoOperation): void;
-  complete(): void;
+  begin(operation: PendingPhotoOperation): Promise<void>;
+  complete(): Promise<void>;
   source: ExpoRestoredOperationSource;
 }>();
 
@@ -119,6 +140,7 @@ const restorationFor = (bindings: ExpoCameraBindings) => {
         try {
           const result = await bindings.getPendingResultAsync();
           if (result === null) return null;
+          operation ??= await storedOperation();
           const method = operation?.kind ?? "pick";
           if ("code" in result)
             restored = {
@@ -160,6 +182,7 @@ const restorationFor = (bindings: ExpoCameraBindings) => {
               };
             }
           }
+          await AsyncStorage.removeItem(PENDING_PHOTO_OPERATION_KEY);
           return restored;
         } catch (error) {
           const normalized = expoFailure(
@@ -181,12 +204,14 @@ const restorationFor = (bindings: ExpoCameraBindings) => {
     },
   };
   const created = {
-    begin(value: PendingPhotoOperation) {
+    async begin(value: PendingPhotoOperation) {
       operation = value;
       restored = undefined;
+      await AsyncStorage.setItem(PENDING_PHOTO_OPERATION_KEY, JSON.stringify(value));
     },
-    complete() {
+    async complete() {
       operation = undefined;
+      await AsyncStorage.removeItem(PENDING_PHOTO_OPERATION_KEY);
     },
     source,
   };
@@ -218,7 +243,7 @@ export const createExpoCameraCapability = (
   },
   takePhoto: async (options) => {
     validateTransform(options?.transform);
-    restoration.begin({ kind: "takePhoto", limit: 1, transform: options?.transform });
+    await restoration.begin({ kind: "takePhoto", limit: 1, transform: options?.transform });
     try {
       const assets = requireResult(
         await bindings.launchCameraAsync({
@@ -232,11 +257,12 @@ export const createExpoCameraCapability = (
         }),
       );
       const selected = await photo(assets[0]!, options?.transform, bindings);
-      restoration.complete();
       return selected;
     } catch (error) {
       if (error instanceof DeviceError) throw error;
       throw expoFailure(error, "Failed to take a native photo.");
+    } finally {
+      await restoration.complete();
     }
   },
   };
@@ -256,7 +282,7 @@ export const createExpoPhotosCapability = (
     const limit = options?.limit ?? 1;
     if (!Number.isInteger(limit) || limit < 1 || limit > 100)
       throw new TypeError("Photo pick limit must be an integer from 1 to 100.");
-    restoration.begin({ kind: "pick", limit, transform: options?.transform });
+    await restoration.begin({ kind: "pick", limit, transform: options?.transform });
     try {
       const result = await bindings.launchImageLibraryAsync({
         allowsMultipleSelection: limit > 1,
@@ -266,7 +292,6 @@ export const createExpoPhotosCapability = (
         selectionLimit: limit,
       });
       if (result.canceled) {
-        restoration.complete();
         return [];
       }
       const selected = await Promise.all(
@@ -274,10 +299,11 @@ export const createExpoPhotosCapability = (
           photo(asset, options?.transform, bindings),
         ),
       );
-      restoration.complete();
       return selected;
     } catch (error) {
       throw expoFailure(error, "Failed to pick native photos.");
+    } finally {
+      await restoration.complete();
     }
     },
   };

@@ -1,4 +1,20 @@
-import { describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
+
+const persisted = new Map<string, string>();
+
+beforeEach(() => persisted.clear());
+
+mock.module("@react-native-async-storage/async-storage", () => ({
+  default: {
+    getItem: async (key: string) => persisted.get(key) ?? null,
+    removeItem: async (key: string) => {
+      persisted.delete(key);
+    },
+    setItem: async (key: string, value: string) => {
+      persisted.set(key, value);
+    },
+  },
+}));
 
 mock.module("expo-image-picker", () => ({
   CameraType: { back: "back", front: "front" },
@@ -107,6 +123,7 @@ describe("Expo photo restoration", () => {
     void camera.takePhoto({
       transform: { height: 20, quality: 80, width: 30 },
     });
+    await Bun.sleep(0);
 
     expect(await takeExpoRestoredOperation(camera)).toEqual({
       data: {
@@ -120,6 +137,28 @@ describe("Expo photo restoration", () => {
       success: true,
     });
     expect(provider.manipulateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  test("restores the operation shape after the JavaScript process is replaced", async () => {
+    const interruptedProvider = bindings(null);
+    interruptedProvider.launchCameraAsync = async () => new Promise(() => undefined);
+    void createExpoCameraCapability(interruptedProvider as never).takePhoto();
+    await Bun.sleep(0);
+
+    const restoredProvider = bindings({
+      assets: [{ height: 3, uri: "file:///cache/restored-camera.jpg", width: 4 }],
+      canceled: false,
+    });
+    const restored = await takeExpoRestoredOperation(
+      createExpoCameraCapability(restoredProvider as never),
+    );
+
+    expect(restored).toMatchObject({
+      method: "takePhoto",
+      plugin: "expo-image-picker",
+      success: true,
+    });
+    expect(persisted.size).toBe(0);
   });
 
   test("replays one restored operation to late listeners and honors cleanup", async () => {
@@ -164,7 +203,7 @@ describe("Expo photo restoration", () => {
     expect(removed).toHaveLength(0);
   });
 
-  test("retries briefly when Android publishes the result after activity recreation", async () => {
+  test("retries within a bounded window when Android publishes after recreation", async () => {
     let pending: unknown = null;
     const provider = bindings(null);
     provider.getPendingResultAsync = mock(async () => pending) as never;

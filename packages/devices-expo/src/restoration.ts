@@ -13,7 +13,7 @@ export type ExpoRestoredOperationSource = {
 };
 
 const RESTORATION_POLL_INTERVAL_MS = 250;
-const RESTORATION_POLL_ATTEMPTS = 20;
+const RESTORATION_POLL_ATTEMPTS = 120;
 
 const delay = (durationMs: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, durationMs));
