@@ -163,4 +163,45 @@ describe("Expo photo restoration", () => {
     await Bun.sleep(0);
     expect(removed).toHaveLength(0);
   });
+
+  test("retries briefly when Android publishes the result after activity recreation", async () => {
+    let pending: unknown = null;
+    const provider = bindings(null);
+    provider.getPendingResultAsync = mock(async () => pending) as never;
+    const lifecycle = createExpoRestoredOperationLifecycle(
+      createExpoPhotosCapability(provider as never),
+      true,
+    );
+    const restored: unknown[] = [];
+    const stop = await lifecycle.onRestoredOperation((value) =>
+      restored.push(value),
+    );
+    await Bun.sleep(20);
+    expect(restored).toHaveLength(0);
+
+    pending = {
+      assets: [{ height: 3, uri: "file:///cache/late.jpg", width: 4 }],
+      canceled: false,
+    };
+    const deadline = Date.now() + 1_000;
+    while (restored.length === 0 && Date.now() < deadline) await Bun.sleep(25);
+
+    expect(restored).toEqual([
+      {
+        data: [
+          {
+            height: 3,
+            uri: "file:///cache/late.jpg",
+            webPath: "file:///cache/late.jpg",
+            width: 4,
+          },
+        ],
+        method: "pick",
+        plugin: "expo-image-picker",
+        success: true,
+      },
+    ]);
+    expect(provider.getPendingResultAsync.mock.calls.length).toBeGreaterThan(1);
+    await stop();
+  });
 });

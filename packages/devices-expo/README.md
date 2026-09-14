@@ -13,6 +13,8 @@ the system recreates the host activity. The normalized result is replayed once
 per subscriber through `lifecycle.onRestoredOperation`; embedded routes receive
 photo bytes through the same bounded transfer bridge as an ordinary pick. Native
 paths and Expo result objects are not exposed across that bridge. This recovery
-requires no application-owned Android code. A restored operation uses
+uses a short, bounded retry window so a result published just after activity
+recreation is still recovered without application-owned Android code or
+continuous polling. A restored operation uses
 `plugin: "expo-image-picker"`, `method: "pick"`, and carries either normalized
 `DevicePhoto[]` data or a public error.

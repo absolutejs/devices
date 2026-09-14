@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/devices-expo",
-	"version": "0.0.7",
+	"version": "0.0.8",
   "description": "Expo runtime adapter for @absolutejs/devices",
   "type": "module",
   "license": "BSL-1.1",
