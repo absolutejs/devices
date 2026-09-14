@@ -136,29 +136,35 @@ export const createExpoCameraCapability = (
 export const createExpoPhotosCapability = (
   bindings: ExpoCameraBindings = defaultBindings(),
 ): ExpoPhotosCapability => {
+  let restored: DeviceRestoredOperation | undefined;
   let pendingRead: Promise<DeviceRestoredOperation | null> | undefined;
-  const takeRestoredOperation = () =>
-    (pendingRead ??= (async (): Promise<DeviceRestoredOperation | null> => {
+  const takeRestoredOperation = () => {
+    if (restored) return Promise.resolve(restored);
+    pendingRead ??= (async (): Promise<DeviceRestoredOperation | null> => {
       try {
         const result = await bindings.getPendingResultAsync();
         if (result === null) return null;
-        if ("code" in result)
-          return {
+        if ("code" in result) {
+          restored = {
             error: { code: result.code, message: result.message },
             method: "pick",
             plugin: "expo-image-picker",
             success: false,
           };
-        if (result.canceled)
-          return {
+          return restored;
+        }
+        if (result.canceled) {
+          restored = {
             error: { code: "cancelled", message: "Photo selection was cancelled." },
             method: "pick",
             plugin: "expo-image-picker",
             success: false,
           };
+          return restored;
+        }
         const assets = result.assets ?? [];
-        if (assets.length === 0)
-          return {
+        if (assets.length === 0) {
+          restored = {
             error: {
               code: "failed",
               message: "The restored native picker returned no photos.",
@@ -167,7 +173,9 @@ export const createExpoPhotosCapability = (
             plugin: "expo-image-picker",
             success: false,
           };
-        return {
+          return restored;
+        }
+        restored = {
           data: await Promise.all(
             assets.slice(0, 100).map((asset) => photo(asset, undefined, bindings)),
           ),
@@ -175,19 +183,25 @@ export const createExpoPhotosCapability = (
           plugin: "expo-image-picker",
           success: true,
         };
+        return restored;
       } catch (error) {
         const normalized = expoFailure(
           error,
           "Failed to restore native photo selection.",
         );
-        return {
+        restored = {
           error: { code: normalized.code, message: normalized.message },
           method: "pick",
           plugin: "expo-image-picker",
           success: false,
         };
+        return restored;
       }
-    })());
+    })().finally(() => {
+      pendingRead = undefined;
+    });
+    return pendingRead;
+  };
 
   return {
     [EXPO_RESTORED_OPERATION_SOURCE]: takeRestoredOperation,

@@ -30,6 +30,7 @@ export const createExpoRestoredOperationLifecycle = (
   value: unknown,
   enabled: boolean,
 ): {
+  check(): Promise<void>;
   onRestoredOperation(
     listener: (operation: DeviceRestoredOperation) => void,
   ): Promise<DeviceSubscription>;
@@ -41,27 +42,32 @@ export const createExpoRestoredOperationLifecycle = (
   >();
   let restored: DeviceRestoredOperation | null | undefined;
   let read: Promise<void> | undefined;
-  const start = () =>
-    (read ??= (async () => {
+  const deliver = () => {
+    if (!restored) return;
+    for (const [listener, delivered] of listeners) {
+      if (delivered) continue;
+      listeners.set(listener, true);
+      listener(restored);
+    }
+  };
+  const start = () => {
+    if (restored) {
+      deliver();
+      return Promise.resolve();
+    }
+    return (read ??= (async () => {
       restored = enabled && source ? await takeExpoRestoredOperation(source) : null;
-      if (!restored) return;
-      for (const [listener, delivered] of listeners) {
-        if (delivered) continue;
-        listeners.set(listener, true);
-        listener(restored);
-      }
-    })());
+      deliver();
+    })().finally(() => {
+      read = undefined;
+    }));
+  };
 
   return {
+    check: start,
     onRestoredOperation: async (listener) => {
       listeners.set(listener, false);
       void start();
-      if (restored) {
-        listeners.set(listener, true);
-        queueMicrotask(() => {
-          if (listeners.has(listener)) listener(restored!);
-        });
-      }
       return async () => {
         listeners.delete(listener);
       };

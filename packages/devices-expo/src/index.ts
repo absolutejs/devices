@@ -137,7 +137,16 @@ export const createExpoDeviceAdapter = (
         );
         return removable(() => subscription.remove());
       },
-      onRestoredOperation: restoredLifecycle.onRestoredOperation,
+      onRestoredOperation: async (listener) => {
+        const remove = await restoredLifecycle.onRestoredOperation(listener);
+        const subscription = AppState.addEventListener("change", (state) => {
+          if (state === "active") void restoredLifecycle.check();
+        });
+        return removable(async () => {
+          subscription.remove();
+          await remove();
+        });
+      },
       onResume: async (listener) => {
         let previous = lifecycleState(AppState.currentState);
         const subscription = AppState.addEventListener("change", (next) => {
