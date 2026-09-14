@@ -99,7 +99,7 @@ export const createExpoDeviceAdapter = (
   );
   const key = (value: string) => `${prefix}${value}`;
   const restoredLifecycle = createExpoRestoredOperationLifecycle(
-    options.photos,
+    options.photos ?? options.camera,
     Platform.OS === "android",
   );
   return {

@@ -28,13 +28,14 @@ export type ExpoCameraBindings = Pick<
   manipulateAsync: typeof ImageManipulator.manipulateAsync;
 };
 
-export type ExpoPhotosCapability = DevicePhotosCapability &
+export type ExpoCameraCapability = DeviceCameraCapability &
   ExpoRestoredOperationSource;
+export type ExpoPhotosCapability = DevicePhotosCapability & ExpoRestoredOperationSource;
 
-const defaultBindings = (): ExpoCameraBindings => ({
+const nativeBindings: ExpoCameraBindings = {
   ...ImagePicker,
   manipulateAsync: ImageManipulator.manipulateAsync,
-});
+};
 
 const validateTransform = (transform?: DevicePhotoTransform) => {
   if (!transform) return;
@@ -93,9 +94,113 @@ const cameraPermission = (
   value: ImagePicker.CameraPermissionResponse,
 ): DevicePermissionStatus => expoPermissionStatus(value);
 
+type PendingPhotoOperation = {
+  kind: "pick" | "takePhoto";
+  limit: number;
+  transform?: DevicePhotoTransform;
+};
+
+const restorations = new WeakMap<object, {
+  begin(operation: PendingPhotoOperation): void;
+  complete(): void;
+  source: ExpoRestoredOperationSource;
+}>();
+
+const restorationFor = (bindings: ExpoCameraBindings) => {
+  const known = restorations.get(bindings);
+  if (known) return known;
+  let operation: PendingPhotoOperation | undefined;
+  let restored: DeviceRestoredOperation | undefined;
+  let pendingRead: Promise<DeviceRestoredOperation | null> | undefined;
+  const source: ExpoRestoredOperationSource = {
+    [EXPO_RESTORED_OPERATION_SOURCE]: () => {
+      if (restored) return Promise.resolve(restored);
+      pendingRead ??= (async (): Promise<DeviceRestoredOperation | null> => {
+        try {
+          const result = await bindings.getPendingResultAsync();
+          if (result === null) return null;
+          const method = operation?.kind ?? "pick";
+          if ("code" in result)
+            restored = {
+              error: { code: result.code, message: result.message },
+              method,
+              plugin: "expo-image-picker",
+              success: false,
+            };
+          else if (result.canceled)
+            restored = {
+              error: { code: "cancelled", message: "Photo selection was cancelled." },
+              method,
+              plugin: "expo-image-picker",
+              success: false,
+            };
+          else {
+            const assets = result.assets ?? [];
+            if (assets.length === 0)
+              restored = {
+                error: {
+                  code: "failed",
+                  message: "The restored native picker returned no photos.",
+                },
+                method,
+                plugin: "expo-image-picker",
+                success: false,
+              };
+            else {
+              const selected = await Promise.all(
+                assets
+                  .slice(0, operation?.limit ?? 100)
+                  .map((asset) => photo(asset, operation?.transform, bindings)),
+              );
+              restored = {
+                data: method === "takePhoto" ? selected[0] : selected,
+                method,
+                plugin: "expo-image-picker",
+                success: true,
+              };
+            }
+          }
+          return restored;
+        } catch (error) {
+          const normalized = expoFailure(
+            error,
+            "Failed to restore native photo selection.",
+          );
+          restored = {
+            error: { code: normalized.code, message: normalized.message },
+            method: operation?.kind ?? "pick",
+            plugin: "expo-image-picker",
+            success: false,
+          };
+          return restored;
+        }
+      })().finally(() => {
+        pendingRead = undefined;
+      });
+      return pendingRead;
+    },
+  };
+  const created = {
+    begin(value: PendingPhotoOperation) {
+      operation = value;
+      restored = undefined;
+    },
+    complete() {
+      operation = undefined;
+    },
+    source,
+  };
+  restorations.set(bindings, created);
+  return created;
+};
+
 export const createExpoCameraCapability = (
-  bindings: ExpoCameraBindings = defaultBindings(),
-): DeviceCameraCapability => ({
+  bindings: ExpoCameraBindings = nativeBindings,
+): ExpoCameraCapability => {
+  const restoration = restorationFor(bindings);
+  return {
+  [EXPO_RESTORED_OPERATION_SOURCE]:
+    restoration.source[EXPO_RESTORED_OPERATION_SOURCE],
   capability: async () => availableCapability("native"),
   queryPermission: async () => {
     try {
@@ -113,6 +218,7 @@ export const createExpoCameraCapability = (
   },
   takePhoto: async (options) => {
     validateTransform(options?.transform);
+    restoration.begin({ kind: "takePhoto", limit: 1, transform: options?.transform });
     try {
       const assets = requireResult(
         await bindings.launchCameraAsync({
@@ -125,92 +231,32 @@ export const createExpoCameraCapability = (
           quality: 1,
         }),
       );
-      return await photo(assets[0]!, options?.transform, bindings);
+      const selected = await photo(assets[0]!, options?.transform, bindings);
+      restoration.complete();
+      return selected;
     } catch (error) {
       if (error instanceof DeviceError) throw error;
       throw expoFailure(error, "Failed to take a native photo.");
     }
   },
-});
+  };
+};
 
 export const createExpoPhotosCapability = (
-  bindings: ExpoCameraBindings = defaultBindings(),
+  bindings: ExpoCameraBindings = nativeBindings,
 ): ExpoPhotosCapability => {
-  let restored: DeviceRestoredOperation | undefined;
-  let pendingRead: Promise<DeviceRestoredOperation | null> | undefined;
-  const takeRestoredOperation = () => {
-    if (restored) return Promise.resolve(restored);
-    pendingRead ??= (async (): Promise<DeviceRestoredOperation | null> => {
-      try {
-        const result = await bindings.getPendingResultAsync();
-        if (result === null) return null;
-        if ("code" in result) {
-          restored = {
-            error: { code: result.code, message: result.message },
-            method: "pick",
-            plugin: "expo-image-picker",
-            success: false,
-          };
-          return restored;
-        }
-        if (result.canceled) {
-          restored = {
-            error: { code: "cancelled", message: "Photo selection was cancelled." },
-            method: "pick",
-            plugin: "expo-image-picker",
-            success: false,
-          };
-          return restored;
-        }
-        const assets = result.assets ?? [];
-        if (assets.length === 0) {
-          restored = {
-            error: {
-              code: "failed",
-              message: "The restored native picker returned no photos.",
-            },
-            method: "pick",
-            plugin: "expo-image-picker",
-            success: false,
-          };
-          return restored;
-        }
-        restored = {
-          data: await Promise.all(
-            assets.slice(0, 100).map((asset) => photo(asset, undefined, bindings)),
-          ),
-          method: "pick",
-          plugin: "expo-image-picker",
-          success: true,
-        };
-        return restored;
-      } catch (error) {
-        const normalized = expoFailure(
-          error,
-          "Failed to restore native photo selection.",
-        );
-        restored = {
-          error: { code: normalized.code, message: normalized.message },
-          method: "pick",
-          plugin: "expo-image-picker",
-          success: false,
-        };
-        return restored;
-      }
-    })().finally(() => {
-      pendingRead = undefined;
-    });
-    return pendingRead;
-  };
+  const restoration = restorationFor(bindings);
 
   return {
-    [EXPO_RESTORED_OPERATION_SOURCE]: takeRestoredOperation,
+    [EXPO_RESTORED_OPERATION_SOURCE]:
+      restoration.source[EXPO_RESTORED_OPERATION_SOURCE],
     capability: async () => availableCapability("native"),
     pick: async (options) => {
     validateTransform(options?.transform);
     const limit = options?.limit ?? 1;
     if (!Number.isInteger(limit) || limit < 1 || limit > 100)
       throw new TypeError("Photo pick limit must be an integer from 1 to 100.");
+    restoration.begin({ kind: "pick", limit, transform: options?.transform });
     try {
       const result = await bindings.launchImageLibraryAsync({
         allowsMultipleSelection: limit > 1,
@@ -219,12 +265,17 @@ export const createExpoPhotosCapability = (
         quality: 1,
         selectionLimit: limit,
       });
-      if (result.canceled) return [];
-      return await Promise.all(
+      if (result.canceled) {
+        restoration.complete();
+        return [];
+      }
+      const selected = await Promise.all(
         (result.assets ?? []).slice(0, limit).map((asset) =>
           photo(asset, options?.transform, bindings),
         ),
       );
+      restoration.complete();
+      return selected;
     } catch (error) {
       throw expoFailure(error, "Failed to pick native photos.");
     }

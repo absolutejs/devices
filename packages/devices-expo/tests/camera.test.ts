@@ -10,7 +10,9 @@ mock.module("expo-image-manipulator", () => ({
   },
 }));
 
-const { createExpoPhotosCapability } = await import("../src/camera");
+const { createExpoCameraCapability, createExpoPhotosCapability } = await import(
+  "../src/camera"
+);
 const { createExpoRestoredOperationLifecycle, takeExpoRestoredOperation } =
   await import("../src/restoration");
 
@@ -88,6 +90,36 @@ describe("Expo photo restoration", () => {
       plugin: "expo-image-picker",
       success: false,
     });
+  });
+
+  test("restores camera-only operations with their requested transform", async () => {
+    const provider = bindings({
+      assets: [{ height: 8, uri: "file:///cache/camera.jpg", width: 12 }],
+      canceled: false,
+    });
+    provider.launchCameraAsync = async () => new Promise(() => undefined);
+    provider.manipulateAsync = mock(async () => ({
+      height: 20,
+      uri: "file:///cache/transformed.jpg",
+      width: 30,
+    })) as never;
+    const camera = createExpoCameraCapability(provider as never);
+    void camera.takePhoto({
+      transform: { height: 20, quality: 80, width: 30 },
+    });
+
+    expect(await takeExpoRestoredOperation(camera)).toEqual({
+      data: {
+        height: 20,
+        uri: "file:///cache/transformed.jpg",
+        webPath: "file:///cache/transformed.jpg",
+        width: 30,
+      },
+      method: "takePhoto",
+      plugin: "expo-image-picker",
+      success: true,
+    });
+    expect(provider.manipulateAsync).toHaveBeenCalledTimes(1);
   });
 
   test("replays one restored operation to late listeners and honors cleanup", async () => {
