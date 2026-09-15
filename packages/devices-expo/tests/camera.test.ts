@@ -254,7 +254,11 @@ describe("Expo photo restoration", () => {
     const lifecycle = createExpoRestoredOperationLifecycle(
       createExpoCameraCapability(restoredProvider as never),
       true,
-      { pollAttempts: 2, pollIntervalMs: 1 },
+      {
+        pollAttempts: 2,
+        pollIntervalMs: 1,
+        takeCancellation: async () => true,
+      },
     );
     const restored: unknown[] = [];
     const stop = await lifecycle.onRestoredOperation((value) =>

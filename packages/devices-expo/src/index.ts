@@ -48,6 +48,7 @@ export type ExpoDeviceAdapterOptions = {
   share?: DeviceShareCapability;
   storagePrefix?: string;
   systemBars?: DeviceSystemBarsCapability;
+  takeActivityResultCancellation?: () => boolean | Promise<boolean>;
 };
 
 const lifecycleState = (state: string | null): DeviceLifecycleState =>
@@ -101,6 +102,7 @@ export const createExpoDeviceAdapter = (
   const restoredLifecycle = createExpoRestoredOperationLifecycle(
     options.photos ?? options.camera,
     Platform.OS === "android",
+    { takeCancellation: options.takeActivityResultCancellation },
   );
   return {
     runtime: "expo",

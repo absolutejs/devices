@@ -20,8 +20,9 @@ continuous polling. A restored operation uses
 `DevicePhoto[]` data or a public error.
 
 If Android destroys the JavaScript process and the user then cancels the
-external picker, Expo has no successful result to retain. The adapter waits for
-the same bounded recovery window, turns an inherited in-flight descriptor into
-one public `cancelled` operation, and deletes the descriptor. A picker still
-owned by the current JavaScript process is never abandoned by that recovery
-window.
+external picker, Expo has no successful result to retain. AbsoluteJS can inject
+its generated native activity-result cancellation signal; the adapter then
+turns an inherited in-flight descriptor into one public `cancelled` operation
+and deletes the descriptor. Elapsed time is never treated as proof of
+cancellation, and a picker still owned by the current JavaScript process is
+never abandoned.

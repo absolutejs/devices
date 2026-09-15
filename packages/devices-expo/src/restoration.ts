@@ -48,6 +48,7 @@ export const createExpoRestoredOperationLifecycle = (
   timing: {
     pollAttempts?: number;
     pollIntervalMs?: number;
+    takeCancellation?: () => boolean | Promise<boolean>;
   } = {},
 ): {
   check(): Promise<void>;
@@ -91,12 +92,13 @@ export const createExpoRestoredOperationLifecycle = (
       for (let attempt = 0; attempt < pollAttempts; attempt += 1) {
         await start();
         if (restored || listeners.size === 0) return;
+        if (await timing.takeCancellation?.()) {
+          restored =
+            enabled && source ? await takeAbandonedExpoOperation(source) : null;
+          deliver();
+          if (restored) return;
+        }
         await delay(pollIntervalMs);
-      }
-      if (!restored && listeners.size > 0) {
-        restored =
-          enabled && source ? await takeAbandonedExpoOperation(source) : null;
-        deliver();
       }
     })().finally(() => {
       polling = undefined;
