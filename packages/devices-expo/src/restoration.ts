@@ -8,8 +8,13 @@ export const EXPO_RESTORED_OPERATION_SOURCE: unique symbol = Symbol.for(
   "@absolutejs/devices-expo/restored-operation-source",
 ) as never;
 
+export const EXPO_ABANDONED_OPERATION_SOURCE: unique symbol = Symbol.for(
+  "@absolutejs/devices-expo/abandoned-operation-source",
+) as never;
+
 export type ExpoRestoredOperationSource = {
   [EXPO_RESTORED_OPERATION_SOURCE](): Promise<DeviceRestoredOperation | null>;
+  [EXPO_ABANDONED_OPERATION_SOURCE]?(): Promise<DeviceRestoredOperation | null>;
 };
 
 const RESTORATION_POLL_INTERVAL_MS = 250;
@@ -32,15 +37,26 @@ export const takeExpoRestoredOperation = (value: unknown) =>
   expoRestoredOperationSource(value)?.[EXPO_RESTORED_OPERATION_SOURCE]() ??
   Promise.resolve(null);
 
+const takeAbandonedExpoOperation = (value: unknown) => {
+  const source = expoRestoredOperationSource(value);
+  return source?.[EXPO_ABANDONED_OPERATION_SOURCE]?.() ?? Promise.resolve(null);
+};
+
 export const createExpoRestoredOperationLifecycle = (
   value: unknown,
   enabled: boolean,
+  timing: {
+    pollAttempts?: number;
+    pollIntervalMs?: number;
+  } = {},
 ): {
   check(): Promise<void>;
   onRestoredOperation(
     listener: (operation: DeviceRestoredOperation) => void,
   ): Promise<DeviceSubscription>;
 } => {
+  const pollAttempts = timing.pollAttempts ?? RESTORATION_POLL_ATTEMPTS;
+  const pollIntervalMs = timing.pollIntervalMs ?? RESTORATION_POLL_INTERVAL_MS;
   const source = expoRestoredOperationSource(value);
   const listeners = new Map<
     (operation: DeviceRestoredOperation) => void,
@@ -72,10 +88,15 @@ export const createExpoRestoredOperationLifecycle = (
   };
   const startRecoveryWindow = () =>
     (polling ??= (async () => {
-      for (let attempt = 0; attempt < RESTORATION_POLL_ATTEMPTS; attempt += 1) {
+      for (let attempt = 0; attempt < pollAttempts; attempt += 1) {
         await start();
         if (restored || listeners.size === 0) return;
-        await delay(RESTORATION_POLL_INTERVAL_MS);
+        await delay(pollIntervalMs);
+      }
+      if (!restored && listeners.size > 0) {
+        restored =
+          enabled && source ? await takeAbandonedExpoOperation(source) : null;
+        deliver();
       }
     })().finally(() => {
       polling = undefined;

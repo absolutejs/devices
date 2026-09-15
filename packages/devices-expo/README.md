@@ -18,3 +18,10 @@ recreation is still recovered without application-owned Android code or
 continuous polling. A restored operation uses
 `plugin: "expo-image-picker"`, `method: "pick"`, and carries either normalized
 `DevicePhoto[]` data or a public error.
+
+If Android destroys the JavaScript process and the user then cancels the
+external picker, Expo has no successful result to retain. The adapter waits for
+the same bounded recovery window, turns an inherited in-flight descriptor into
+one public `cancelled` operation, and deletes the descriptor. A picker still
+owned by the current JavaScript process is never abandoned by that recovery
+window.

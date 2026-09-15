@@ -243,4 +243,108 @@ describe("Expo photo restoration", () => {
     expect(provider.getPendingResultAsync.mock.calls.length).toBeGreaterThan(1);
     await stop();
   });
+
+  test("turns an abandoned process-death operation into one bounded cancellation", async () => {
+    const interruptedProvider = bindings(null);
+    interruptedProvider.launchCameraAsync = async () => new Promise(() => undefined);
+    void createExpoCameraCapability(interruptedProvider as never).takePhoto();
+    await Bun.sleep(0);
+
+    const restoredProvider = bindings(null);
+    const lifecycle = createExpoRestoredOperationLifecycle(
+      createExpoCameraCapability(restoredProvider as never),
+      true,
+      { pollAttempts: 2, pollIntervalMs: 1 },
+    );
+    const restored: unknown[] = [];
+    const stop = await lifecycle.onRestoredOperation((value) =>
+      restored.push(value),
+    );
+    const deadline = Date.now() + 1_000;
+    while (restored.length === 0 && Date.now() < deadline) await Bun.sleep(25);
+
+    expect(restored).toEqual([
+      {
+        error: {
+          code: "cancelled",
+          message: "Photo selection was cancelled after the native picker closed.",
+        },
+        method: "takePhoto",
+        plugin: "expo-image-picker",
+        success: false,
+      },
+    ]);
+    expect(persisted.size).toBe(0);
+    await lifecycle.check();
+    expect(restored).toHaveLength(1);
+    await stop();
+  });
+
+  test("does not abandon a long-running picker owned by the current process", async () => {
+    let finish: ((value: { assets: null; canceled: true }) => void) | undefined;
+    const provider = bindings(null);
+    provider.launchCameraAsync = () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      });
+    const camera = createExpoCameraCapability(provider as never);
+    const direct = camera.takePhoto().catch((error) => error);
+    await Bun.sleep(0);
+
+    const lifecycle = createExpoRestoredOperationLifecycle(camera, true, {
+      pollAttempts: 2,
+      pollIntervalMs: 1,
+    });
+    const restored: unknown[] = [];
+    const stop = await lifecycle.onRestoredOperation((value) =>
+      restored.push(value),
+    );
+    await Bun.sleep(25);
+
+    expect(restored).toHaveLength(0);
+    expect(persisted.size).toBe(1);
+    finish?.({ assets: null, canceled: true });
+    expect(await direct).toMatchObject({ code: "cancelled" });
+    expect(persisted.size).toBe(0);
+    await stop();
+  });
+
+  test("restores a bounded multi-photo transform from the persisted descriptor", async () => {
+    const interruptedProvider = bindings(null);
+    interruptedProvider.launchImageLibraryAsync = async () =>
+      new Promise(() => undefined);
+    void createExpoPhotosCapability(interruptedProvider as never).pick({
+      limit: 2,
+      transform: { height: 20, quality: 80, width: 30 },
+    });
+    await Bun.sleep(0);
+
+    const restoredProvider = bindings({
+      assets: [
+        { height: 1, uri: "file:///cache/a.jpg", width: 1 },
+        { height: 1, uri: "file:///cache/b.jpg", width: 1 },
+        { height: 1, uri: "file:///cache/c.jpg", width: 1 },
+      ],
+      canceled: false,
+    });
+    restoredProvider.manipulateAsync = mock(async (uri: string) => ({
+      height: 20,
+      uri: uri.replace(".jpg", "-transformed.jpg"),
+      width: 30,
+    })) as never;
+    const restored = await takeExpoRestoredOperation(
+      createExpoPhotosCapability(restoredProvider as never),
+    );
+
+    expect(restored).toMatchObject({
+      data: [
+        { height: 20, uri: "file:///cache/a-transformed.jpg", width: 30 },
+        { height: 20, uri: "file:///cache/b-transformed.jpg", width: 30 },
+      ],
+      method: "pick",
+      success: true,
+    });
+    expect(restoredProvider.manipulateAsync).toHaveBeenCalledTimes(2);
+    expect(persisted.size).toBe(0);
+  });
 });

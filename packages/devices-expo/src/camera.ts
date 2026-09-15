@@ -13,6 +13,7 @@ import {
 } from "@absolutejs/devices";
 import { expoFailure, expoPermissionStatus } from "./common";
 import {
+  EXPO_ABANDONED_OPERATION_SOURCE,
   EXPO_RESTORED_OPERATION_SOURCE,
   type ExpoRestoredOperationSource,
 } from "./restoration";
@@ -202,6 +203,25 @@ const restorationFor = (bindings: ExpoCameraBindings) => {
       });
       return pendingRead;
     },
+    [EXPO_ABANDONED_OPERATION_SOURCE]: async () => {
+      if (restored) return restored;
+      // An operation held in this adapter instance still has a live promise.
+      // Only a descriptor inherited by a fresh JavaScript process is abandoned.
+      if (operation) return null;
+      const abandoned = await storedOperation();
+      if (!abandoned) return null;
+      restored = {
+        error: {
+          code: "cancelled",
+          message: "Photo selection was cancelled after the native picker closed.",
+        },
+        method: abandoned.kind,
+        plugin: "expo-image-picker",
+        success: false,
+      };
+      await AsyncStorage.removeItem(PENDING_PHOTO_OPERATION_KEY);
+      return restored;
+    },
   };
   const created = {
     async begin(value: PendingPhotoOperation) {
@@ -226,6 +246,8 @@ export const createExpoCameraCapability = (
   return {
   [EXPO_RESTORED_OPERATION_SOURCE]:
     restoration.source[EXPO_RESTORED_OPERATION_SOURCE],
+  [EXPO_ABANDONED_OPERATION_SOURCE]:
+    restoration.source[EXPO_ABANDONED_OPERATION_SOURCE],
   capability: async () => availableCapability("native"),
   queryPermission: async () => {
     try {
@@ -276,6 +298,8 @@ export const createExpoPhotosCapability = (
   return {
     [EXPO_RESTORED_OPERATION_SOURCE]:
       restoration.source[EXPO_RESTORED_OPERATION_SOURCE],
+    [EXPO_ABANDONED_OPERATION_SOURCE]:
+      restoration.source[EXPO_ABANDONED_OPERATION_SOURCE],
     capability: async () => availableCapability("native"),
     pick: async (options) => {
     validateTransform(options?.transform);
