@@ -50,7 +50,8 @@ const safeData = (value: unknown): Record<string, unknown> => {
     typeof safe === "object" && safe !== null && !Array.isArray(safe)
       ? (safe as Record<string, unknown>)
       : {};
-  return new TextEncoder().encode(JSON.stringify(data)).byteLength <= MAX_DATA_BYTES
+  return new TextEncoder().encode(JSON.stringify(data)).byteLength <=
+    MAX_DATA_BYTES
     ? data
     : {};
 };
@@ -109,7 +110,10 @@ export const createExpoPushNotificationsCapability = (
         tokenSubscription = undefined;
         await Notifications.unregisterForNotificationsAsync();
       } catch (error) {
-        throw expoFailure(error, "Failed to disable native push notifications.");
+        throw expoFailure(
+          error,
+          "Failed to disable native push notifications.",
+        );
       }
       if (backendError !== undefined)
         throw expoFailure(
@@ -119,13 +123,15 @@ export const createExpoPushNotificationsCapability = (
     },
     enable: async () => {
       try {
-        const token = registration(await Notifications.getDevicePushTokenAsync());
+        const token = registration(
+          await Notifications.getDevicePushTokenAsync(),
+        );
         await options.onRegistration?.(token);
         tokenSubscription?.remove();
         tokenSubscription = Notifications.addPushTokenListener((next) => {
-          void Promise.resolve(options.onRegistration?.(registration(next))).catch(
-            () => undefined,
-          );
+          void Promise.resolve(
+            options.onRegistration?.(registration(next)),
+          ).catch(() => undefined);
         });
       } catch (registrationError) {
         try {
@@ -141,28 +147,43 @@ export const createExpoPushNotificationsCapability = (
       }
     },
     onAction: async (listener) => {
-      const subscription = Notifications.addNotificationResponseReceivedListener(
-        (value) => {
-          const mapped = notification(value.notification);
-          if (!mapped) return;
-          listener({
-            actionId:
-              value.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER
-                ? "tap"
-                : value.actionIdentifier,
-            ...(value.userText ? { inputValue: value.userText } : {}),
-            native: value,
-            notification: mapped,
-          });
-        },
-      );
+      // A tap that launched the app can arrive before anything subscribed,
+      // so the launch response is replayed once to the first subscriber and
+      // then cleared. Identity guards against a platform that also reports
+      // it through the listener.
+      const delivered = new Set<string>();
+      const deliver = (value: Notifications.NotificationResponse) => {
+        const mapped = notification(value.notification);
+        if (!mapped) return;
+        const identity = `${mapped.id}\u0000${value.actionIdentifier}`;
+        if (delivered.has(identity)) return;
+        delivered.add(identity);
+        listener({
+          actionId:
+            value.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER
+              ? "tap"
+              : value.actionIdentifier,
+          ...(value.userText ? { inputValue: value.userText } : {}),
+          native: value,
+          notification: mapped,
+        });
+      };
+      const subscription =
+        Notifications.addNotificationResponseReceivedListener(deliver);
+      const launchResponse = Notifications.getLastNotificationResponse();
+      if (launchResponse) {
+        Notifications.clearLastNotificationResponse();
+        deliver(launchResponse);
+      }
       return removable(() => subscription.remove());
     },
     onReceived: async (listener) => {
-      const subscription = Notifications.addNotificationReceivedListener((value) => {
-        const mapped = notification(value);
-        if (mapped) listener(mapped);
-      });
+      const subscription = Notifications.addNotificationReceivedListener(
+        (value) => {
+          const mapped = notification(value);
+          if (mapped) listener(mapped);
+        },
+      );
       return removable(() => subscription.remove());
     },
     queryPermission: async () =>
