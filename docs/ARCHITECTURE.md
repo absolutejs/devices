@@ -2,9 +2,9 @@
 
 ## Boundary
 
-`@absolutejs/devices` describes user capabilities, not vendor plugins. An application asks to share, inspect connectivity, or store a value. A build-selected adapter implements that operation for the browser, SSR, Capacitor, tests, and later Expo.
+`@absolutejs/devices` describes user capabilities, not vendor plugins. An application asks to share, inspect connectivity, or store a value. A build-selected adapter implements that operation for the browser, SSR, Capacitor, Expo, and tests.
 
-The core package must remain safe to import during SSR and must not depend on Capacitor. The Capacitor package can depend on narrowly selected plugins. Future Expo dependencies belong in a third package only when the Expo runtime exists.
+The core package must remain safe to import during SSR and must not depend on Capacitor or Expo. The Capacitor and Expo packages (`@absolutejs/devices-capacitor`, `@absolutejs/devices-expo`) can each depend on narrowly selected plugins or Expo modules for their own runtime.
 
 ## Selection
 
@@ -14,6 +14,7 @@ AbsoluteJS injects an adapter during target bootstrap:
 web build       -> web adapter
 server build    -> SSR adapter
 Capacitor build -> Capacitor adapter
+Expo build      -> Expo adapter in the native host; a bridge adapter in WebView pages
 test            -> explicit in-memory adapter
 ```
 

@@ -11,6 +11,8 @@ import type {
   DevicePermissionCapability,
   DevicePermissionStatus,
   DevicePlatformInfo,
+  DevicePushNotification,
+  DevicePushNotificationAction,
   DeviceRestoredOperation,
   DeviceShareContent,
   DeviceShareResult,
@@ -40,6 +42,16 @@ export type TestDeviceController = {
     inputValue?: string,
   ): void;
   emitNetwork(status: DeviceNetworkStatus): void;
+  /** Delivers a push notification to `onReceived` listeners. Push must be enabled. */
+  emitPushReceived(
+    notification?: Partial<DevicePushNotification>,
+  ): DevicePushNotification;
+  /** Delivers a push notification action, `tap` by default. Push must be enabled. */
+  emitPushAction(
+    notification?: Partial<DevicePushNotification>,
+    actionId?: string,
+    inputValue?: string,
+  ): DevicePushNotificationAction;
   emitRestoredOperation(operation: DeviceRestoredOperation): void;
   clipboardText: string;
   cameraPermission: TestPermissionController;
@@ -54,6 +66,10 @@ export type TestDeviceController = {
   openedDocuments: DeviceWriteDocumentOptions[];
   openedExternalUrls: string[];
   pendingNotifications: DeviceLocalNotification[];
+  /** Whether `pushNotifications.enable()` registered and `disable()` has not since run. */
+  readonly pushEnabled: boolean;
+  /** `enable` and `disable` calls in order. */
+  pushEvents: string[];
   sharedContent: DeviceShareContent[];
   secureStorage: Map<string, string>;
   storage: Map<string, string>;
@@ -124,6 +140,31 @@ export const createTestDeviceAdapter = (
   const notificationReceivedListeners = new Set<
     (notification: DeviceLocalNotification) => void
   >();
+  const pushReceivedListeners = new Set<
+    (notification: DevicePushNotification) => void
+  >();
+  const pushActionListeners = new Set<
+    (action: DevicePushNotificationAction) => void
+  >();
+  const pushEvents: string[] = [];
+  let pushEnabled = false;
+  let pushSequence = 0;
+  const requirePushEnabled = () => {
+    if (!pushEnabled)
+      throw new Error(
+        "Test push notifications are not enabled; call pushNotifications.enable() first.",
+      );
+  };
+  const testPushNotification = (
+    notification: Partial<DevicePushNotification> = {},
+  ): DevicePushNotification => {
+    pushSequence += 1;
+    return {
+      data: {},
+      id: `test-push-${pushSequence}`,
+      ...notification,
+    };
+  };
   const values = new Map<string, string>();
   const secureValues = new Map<string, string>();
   const openedExternalUrls: string[] = [];
@@ -297,6 +338,42 @@ export const createTestDeviceAdapter = (
         notificationHistory.set(notification.id, notification);
         return notification;
       },
+    },
+    pushNotifications: {
+      capability: async () => availableCapability("emulated"),
+      disable: async () => {
+        pushEnabled = false;
+        pushEvents.push("disable");
+      },
+      enable: async () => {
+        const permission =
+          await notificationPermission.permission.queryPermission();
+        if (permission.state !== "granted")
+          throw new DeviceError(
+            permission.state === "denied"
+              ? "permission-denied"
+              : permission.state === "blocked"
+                ? "permission-blocked"
+                : "permission-required",
+            "Notification permission must be explicitly granted before enabling push notifications.",
+          );
+        pushEnabled = true;
+        pushEvents.push("enable");
+      },
+      onAction: async (listener) => {
+        pushActionListeners.add(listener);
+        return () => {
+          pushActionListeners.delete(listener);
+        };
+      },
+      onReceived: async (listener) => {
+        pushReceivedListeners.add(listener);
+        return () => {
+          pushReceivedListeners.delete(listener);
+        };
+      },
+      queryPermission: notificationPermission.permission.queryPermission,
+      requestPermission: notificationPermission.permission.requestPermission,
     },
     platform: {
       getInfo: async () => ({
@@ -478,6 +555,22 @@ export const createTestDeviceAdapter = (
       networkStatus = status;
       for (const listener of networkListeners) listener(status);
     },
+    emitPushAction: (notification, actionId = "tap", inputValue) => {
+      requirePushEnabled();
+      const action: DevicePushNotificationAction = {
+        actionId,
+        ...(inputValue === undefined ? {} : { inputValue }),
+        notification: testPushNotification(notification),
+      };
+      for (const listener of pushActionListeners) listener(action);
+      return action;
+    },
+    emitPushReceived: (notification) => {
+      requirePushEnabled();
+      const received = testPushNotification(notification);
+      for (const listener of pushReceivedListeners) listener(received);
+      return received;
+    },
     emitRestoredOperation: (operation) => {
       for (const listener of restoredListeners) listener(operation);
     },
@@ -490,6 +583,10 @@ export const createTestDeviceAdapter = (
     notificationPermission,
     openedExternalUrls,
     pendingNotifications,
+    get pushEnabled() {
+      return pushEnabled;
+    },
+    pushEvents,
     exportedDocuments,
     pickedPhotos,
     pickedDocuments,

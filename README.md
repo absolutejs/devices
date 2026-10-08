@@ -2,12 +2,13 @@
 
 Provider-neutral device capabilities for AbsoluteJS applications.
 
-The repository publishes two deliberately separate packages:
+The repository publishes three deliberately separate packages:
 
 - `@absolutejs/devices` — dependency-light contracts plus web, SSR, and test adapters.
 - `@absolutejs/devices-capacitor` — Capacitor implementations selected by an AbsoluteJS mobile build.
+- `@absolutejs/devices-expo` — Expo SDK implementations for the AbsoluteJS Expo shell, plus the bridge that exposes them to pages in its WebView.
 
-Application code imports capabilities from `@absolutejs/devices`; it does not branch on Capacitor or call vendor plugins directly. AbsoluteJS selects the runtime adapter for web, SSR, tests, and installed apps.
+Application code imports capabilities from `@absolutejs/devices`; it does not branch on Capacitor or Expo or call vendor plugins directly. AbsoluteJS selects the runtime adapter for web, SSR, tests, and installed apps.
 
 The adapter registry is realm-scoped rather than module-scoped. This is required
 because an embedded page and the AbsoluteJS native shell can be compiled as
